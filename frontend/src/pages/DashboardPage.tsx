@@ -7,6 +7,7 @@ import { BrutalBadge } from "@/components/shared/BrutalBadge";
 import { VoiceRecorderModal } from "@/components/shared/VoiceRecorderModal";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
 import { dashboardStats, recentActivity, currentUser } from "@/data/mockData";
+import type { VoiceProcessResponse } from "@/lib/voiceApi";
 import { DollarSign, TrendingDown, TrendingUp, Mic, Lightbulb } from "lucide-react";
 
 export default function DashboardPage() {
@@ -18,8 +19,8 @@ export default function DashboardPage() {
     return () => clearTimeout(t);
   }, []);
 
-  const handleSave = (transcript: string) => {
-    console.log("Saved transcript:", transcript);
+  const handleSave = (result: VoiceProcessResponse) => {
+    console.log("Voice parse result:", result);
   };
 
   if (loading) {
