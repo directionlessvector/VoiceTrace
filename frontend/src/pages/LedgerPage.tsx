@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/layouts/AppLayout";
 import { BrutalCard } from "@/components/shared/BrutalCard";
@@ -5,7 +6,13 @@ import { BrutalBadge } from "@/components/shared/BrutalBadge";
 import { BrutalButton } from "@/components/shared/BrutalButton";
 import { BrutalModal } from "@/components/shared/BrutalModal";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
-import { getVoiceSessionById, listCurrentUserLedgerEntries, type LedgerEntry, updateLedgerEntryById, updateVoiceSessionTranscript } from "@/lib/ledgerApi";
+import {
+  getVoiceSessionById,
+  listCurrentUserLedgerEntries,
+  type LedgerEntry,
+  updateLedgerEntryById,
+  updateVoiceSessionTranscript,
+} from "@/lib/ledgerApi";
 import { Search, Play, Pause, Edit3, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -44,6 +51,7 @@ function groupEntriesByDay(entries: LedgerEntry[]): LedgerRow[] {
   for (const entry of entries) {
     const key = `${entry.entryDate}::${entry.voiceSessionId ?? entry.id}`;
     const amount = Number(entry.amount || 0);
+
     const existing = grouped.get(key) ?? {
       id: key,
       voiceSessionId: entry.voiceSessionId,
@@ -75,6 +83,7 @@ function groupEntriesByDay(entries: LedgerEntry[]): LedgerRow[] {
     }
 
     existing.profit = existing.earnings - existing.expenses;
+
     if (!existing.sources.includes(entry.source)) {
       existing.sources.push(entry.source);
     }
@@ -98,17 +107,22 @@ function groupEntriesByDay(entries: LedgerEntry[]): LedgerRow[] {
       const hasZeroAmounts = row.earnings === 0 && row.expenses === 0;
       row.confidence = hasZeroAmounts ? 0.5 : 0.72;
     }
-
     row.status = row.confidence < 0.65 ? "approximate" : "confirmed";
   }
 
   return [...grouped.values()].sort((a, b) => b.date.localeCompare(a.date));
 }
 
+// Simple UUID validator (basic check)
+function isValidUUID(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 const PAGE_SIZE = 10;
 
 export default function LedgerPage() {
   const { toast } = useToast();
+
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [entries, setEntries] = useState<LedgerRow[]>([]);
@@ -119,12 +133,14 @@ export default function LedgerPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "sales" | "expenses" | "profit" | "loss">("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+
   const [selectedEntry, setSelectedEntry] = useState<LedgerRow | null>(null);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
   const [editItems, setEditItems] = useState("");
   const [editExpenses, setEditExpenses] = useState("");
   const [editEarnings, setEditEarnings] = useState("0");
@@ -133,28 +149,59 @@ export default function LedgerPage() {
 
   useEffect(() => {
     let mounted = true;
+
     (async () => {
       try {
         const rows = await listCurrentUserLedgerEntries();
         if (!mounted) return;
 
         const grouped = groupEntriesByDay(rows);
-        const withVoice = await Promise.all(
-          grouped.map(async (row) => {
-            const sessionId = row.id.split("::")[1];
-            if (!sessionId || sessionId === row.id) return row;
-            try {
-              const session = await getVoiceSessionById(sessionId);
-              return {
-                ...row,
-                transcript: session.transcriptionClean ?? row.transcript,
-                audioUrl: session.cloudinaryUrl,
-              };
-            } catch {
-              return row;
-            }
-          })
-        );
+
+        // === Fetch voice data ONLY for rows that have valid voiceSessionId ===
+        const voiceRows = grouped.filter((row) => {
+          const sessionId = row.voiceSessionId;
+          return sessionId && isValidUUID(sessionId);
+        });
+
+        const voiceDataMap = new Map<string, { transcript: string; audioUrl?: string }>();
+
+        if (voiceRows.length > 0) {
+          const voiceResults = await Promise.all(
+            voiceRows.map(async (row) => {
+              try {
+                const session = await getVoiceSessionById(row.voiceSessionId!);
+                return {
+                  id: row.id,
+                  transcript: session.transcriptionClean ?? "",
+                  audioUrl: session.cloudinaryUrl,
+                };
+              } catch (err) {
+                console.warn(`Failed to fetch voice session ${row.voiceSessionId}:`, err);
+                return { id: row.id, transcript: "", audioUrl: undefined };
+              }
+            })
+          );
+
+          voiceResults.forEach((result) => {
+            voiceDataMap.set(result.id, {
+              transcript: result.transcript,
+              audioUrl: result.audioUrl,
+            });
+          });
+        }
+
+        // Merge voice data back into grouped rows
+        const withVoice: LedgerRow[] = grouped.map((row) => {
+          const voiceInfo = voiceDataMap.get(row.id);
+          if (voiceInfo) {
+            return {
+              ...row,
+              transcript: voiceInfo.transcript || row.transcript,
+              audioUrl: voiceInfo.audioUrl,
+            };
+          }
+          return row;
+        });
 
         setEntries(withVoice);
       } finally {
@@ -166,7 +213,9 @@ export default function LedgerPage() {
       mounted = false;
       audio?.pause();
     };
-  }, []);
+  }, []); // Empty dependency array is fine here
+
+  // ... rest of your filtering, sorting, and handlers remain the same ...
 
   const filtered = entries
     .filter((e) => {
@@ -212,7 +261,6 @@ export default function LedgerPage() {
     setVisibleCount(PAGE_SIZE);
   };
 
-  // Reset pagination whenever filters/sort change
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [search, sourceFilter, typeFilter, fromDate, toDate, sortBy, sortOrder]);
@@ -238,15 +286,8 @@ export default function LedgerPage() {
       const earningValue = Number(editEarnings || "0");
       const expenseValue = Number(editSpent || "0");
 
-      const itemLabels = editItems
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      const expenseLabels = editExpenses
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const itemLabels = editItems.split(",").map((s) => s.trim()).filter(Boolean);
+      const expenseLabels = editExpenses.split(",").map((s) => s.trim()).filter(Boolean);
 
       const saleIds = selectedEntry.saleEntryIds;
       const expenseIds = selectedEntry.expenseEntryIds;
@@ -286,6 +327,7 @@ export default function LedgerPage() {
       setEntries((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
       setSelectedEntry(updated);
       setIsEditing(false);
+
       toast({ title: "Saved", description: "Ledger entry changes were saved." });
     } catch (error) {
       toast({
@@ -298,33 +340,135 @@ export default function LedgerPage() {
     }
   };
 
-  const handlePlayback = () => {
-    if (!selectedEntry) return;
-    if (!selectedEntry.audioUrl) return;
+  // const handlePlayback = () => {
+  //   if (!selectedEntry?.audioUrl) return;
 
-    if (audio) {
-      audio.pause();
-      setAudio(null);
-      setIsPlaying(false);
+  //   if (audio) {
+  //     audio.pause();
+  //     setAudio(null);
+  //     setIsPlaying(false);
+  //   }
+
+  //   const player = new Audio(selectedEntry.audioUrl);
+  //   player.onended = () => setIsPlaying(false);
+  //   player.onerror = () => setIsPlaying(false);
+
+  //   player.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+  //   setAudio(player);
+
+  //   const words = selectedEntry.transcript.split(" ");
+  //   let i = 0;
+  //   const interval = setInterval(() => {
+  //     setHighlightIndex(i);
+  //     i++;
+  //     if (i >= words.length) {
+  //       clearInterval(interval);
+  //       setTimeout(() => setHighlightIndex(-1), 500);
+  //     }
+  //   }, 200);
+  // };
+
+ const handlePlayback = async () => {
+  if (!selectedEntry?.audioUrl) return;
+
+  // Clean up previous audio and highlighting
+  if (audio) {
+    audio.pause();
+    if ((audio as any)._highlightInterval) {
+      clearInterval((audio as any)._highlightInterval);
+    }
+    setAudio(null);
+  }
+  setIsPlaying(false);
+  setHighlightIndex(-1);
+
+  try {
+    const player = new Audio(selectedEntry.audioUrl);
+    
+    // Wait for metadata to load so we can get accurate duration
+    await new Promise<void>((resolve) => {
+      player.onloadedmetadata = () => resolve();
+      player.onerror = () => resolve(); // continue even on error
+      setTimeout(() => resolve(), 1500); // fallback
+    });
+
+    const duration = player.duration || 0;
+    const words = selectedEntry.transcript.trim().split(/\s+/).filter(Boolean);
+    
+    if (words.length === 0) {
+      // No transcript, just play audio
+      player.play().then(() => setIsPlaying(true)).catch(console.error);
+      setAudio(player);
+      return;
     }
 
-    const player = new Audio(selectedEntry.audioUrl);
-    player.onended = () => setIsPlaying(false);
-    player.onerror = () => setIsPlaying(false);
-    player.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-    setAudio(player);
+    // Calculate dynamic delay per word
+    const baseDelay = duration > 0 
+      ? (duration * 1000 * 0.85) / words.length 
+      : 180;
 
-    const words = selectedEntry.transcript.split(" ");
-    let i = 0;
-    const interval = setInterval(() => {
-      setHighlightIndex(i);
-      i++;
-      if (i >= words.length) { clearInterval(interval); setTimeout(() => setHighlightIndex(-1), 500); }
-    }, 200);
-  };
+    const delayPerWord = Math.max(80, Math.min(baseDelay, 450));
+
+    player.onended = () => {
+      setIsPlaying(false);
+      setHighlightIndex(-1);
+    };
+
+    player.onerror = () => {
+      setIsPlaying(false);
+      setHighlightIndex(-1);
+    };
+
+    // Start audio playback immediately
+    await player.play();
+    setAudio(player);
+    setIsPlaying(true);
+
+    // === 1000ms DELAY before starting highlighting ===
+    setTimeout(() => {
+      if (player.paused || player.ended) return; // audio already stopped
+
+      let currentIndex = 0;
+      const highlightInterval = setInterval(() => {
+        setHighlightIndex(currentIndex);
+        currentIndex++;
+
+        if (currentIndex >= words.length) {
+          clearInterval(highlightInterval);
+          // Keep last word highlighted briefly after audio ends
+          setTimeout(() => {
+            setHighlightIndex(-1);
+          }, 600);
+        }
+      }, delayPerWord);
+
+      // Store interval for cleanup
+      (player as any)._highlightInterval = highlightInterval;
+    }, 1000); // ← 1000ms delay as requested
+
+  } catch (error) {
+    console.error("Playback failed:", error);
+    setIsPlaying(false);
+    setHighlightIndex(-1);
+    toast({
+      title: "Playback failed",
+      description: "Could not play the voice note.",
+      variant: "destructive",
+    });
+  }
+};
 
   if (loading) {
-    return <AppLayout><div className="space-y-4"><SkeletonLoader type="text" lines={1} /><SkeletonLoader type="card" /><SkeletonLoader type="card" /><SkeletonLoader type="card" /></div></AppLayout>;
+    return (
+      <AppLayout>
+        <div className="space-y-4">
+          <SkeletonLoader type="text" lines={1} />
+          <SkeletonLoader type="card" />
+          <SkeletonLoader type="card" />
+          <SkeletonLoader type="card" />
+        </div>
+      </AppLayout>
+    );
   }
 
   return (
@@ -344,14 +488,22 @@ export default function LedgerPage() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-2">
-            <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as typeof sourceFilter)} className="brutal-input px-3 py-2">
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value as typeof sourceFilter)}
+              className="brutal-input px-3 py-2"
+            >
               <option value="all">All Sources</option>
               <option value="voice">Voice</option>
               <option value="ocr">OCR</option>
               <option value="manual">Manual</option>
             </select>
 
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)} className="brutal-input px-3 py-2">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+              className="brutal-input px-3 py-2"
+            >
               <option value="all">All Types</option>
               <option value="sales">Has Sales</option>
               <option value="expenses">Has Expenses</option>
@@ -359,24 +511,44 @@ export default function LedgerPage() {
               <option value="loss">Loss Only</option>
             </select>
 
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className="brutal-input px-3 py-2">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="brutal-input px-3 py-2"
+            >
               <option value="date">Sort: Date</option>
               <option value="earnings">Sort: Earnings</option>
               <option value="expenses">Sort: Expenses</option>
               <option value="profit">Sort: Profit</option>
             </select>
 
-            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)} className="brutal-input px-3 py-2">
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
+              className="brutal-input px-3 py-2"
+            >
               <option value="desc">Order: Desc</option>
               <option value="asc">Order: Asc</option>
             </select>
 
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="brutal-input px-3 py-2" />
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="brutal-input px-3 py-2" />
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="brutal-input px-3 py-2"
+            />
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="brutal-input px-3 py-2"
+            />
           </div>
 
           <div>
-            <BrutalButton variant="outline" size="sm" onClick={clearFilters}>Clear Filters</BrutalButton>
+            <BrutalButton variant="outline" size="sm" onClick={clearFilters}>
+              Clear Filters
+            </BrutalButton>
           </div>
         </div>
 
@@ -388,7 +560,11 @@ export default function LedgerPage() {
         ) : (
           <div className="space-y-3">
             {visibleEntries.map((entry) => (
-              <BrutalCard key={entry.id} className="cursor-pointer hover:translate-x-0.5 hover:translate-y-0.5 transition-transform" onClick={() => openEntry(entry)}>
+              <BrutalCard
+                key={entry.id}
+                className="cursor-pointer hover:translate-x-0.5 hover:translate-y-0.5 transition-transform"
+                onClick={() => openEntry(entry)}
+              >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -409,9 +585,13 @@ export default function LedgerPage() {
                 </div>
               </BrutalCard>
             ))}
+
             {hasMore && (
               <div className="text-center pt-2">
-                <BrutalButton variant="outline" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
+                <BrutalButton
+                  variant="outline"
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                >
                   Load More ({filtered.length - visibleCount} remaining)
                 </BrutalButton>
               </div>
@@ -420,10 +600,37 @@ export default function LedgerPage() {
         )}
       </div>
 
-      {/* Detail Modal */}
-      <BrutalModal open={!!selectedEntry} onClose={() => { setSelectedEntry(null); setHighlightIndex(-1); audio?.pause(); setIsPlaying(false); setIsEditing(false); }} title="Entry Details">
+      {/* Detail Modal - unchanged */}
+      <BrutalModal
+        open={!!selectedEntry}
+        // onClose={() => {
+        //   setSelectedEntry(null);
+        //   setHighlightIndex(-1);
+        //   audio?.pause();
+        //   setIsPlaying(false);
+        //   setIsEditing(false);
+        // }}
+        onClose={() => {
+  setSelectedEntry(null);
+  setHighlightIndex(-1);
+  
+  if (audio) {
+    audio.pause();
+    // Clear any stored highlight interval
+    if ((audio as any)._highlightInterval) {
+      clearInterval((audio as any)._highlightInterval);
+    }
+    setAudio(null);
+  }
+  
+  setIsPlaying(false);
+  setIsEditing(false);
+}}
+        title="Entry Details"
+      >
         {selectedEntry && (
           <div className="space-y-4">
+            {/* ... Your existing modal content remains exactly the same ... */}
             <div className="flex items-center justify-between">
               <p className="font-bold">{selectedEntry.date}</p>
               <div className="flex items-center gap-2">
@@ -442,6 +649,11 @@ export default function LedgerPage() {
               </div>
             </div>
 
+            {/* Items Sold, Expenses, Transcript, Financial Summary sections remain unchanged */}
+            {/* (I omitted repeating the full modal for brevity — copy it from your original code) */}
+
+            {/* Paste your original modal content here (from <div className="space-y-4"> to the end) */}
+            {/* It is identical to what you provided */}
             <div>
               <h4 className="text-sm font-bold uppercase tracking-wide mb-2">Items Sold</h4>
               {isEditing ? (
@@ -542,6 +754,8 @@ export default function LedgerPage() {
                 </p>
               </div>
             </div>
+
+
           </div>
         )}
       </BrutalModal>

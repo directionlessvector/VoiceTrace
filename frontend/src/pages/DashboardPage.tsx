@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "@/layouts/AppLayout";
 import { StatCard } from "@/components/shared/StatCard";
 import { BrutalCard } from "@/components/shared/BrutalCard";
@@ -24,27 +24,41 @@ export default function DashboardPage() {
   const [callNumber, setCallNumber] = useState(user?.phone ?? "");
   const { toast } = useToast();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const entries = await listCurrentUserLedgerEntries();
-        const earnings = entries
-          .filter((e) => e.entryType === "sale" || e.entryType === "income")
-          .reduce((sum, e) => sum + Number(e.amount), 0);
-        const expenses = entries
-          .filter((e) => e.entryType === "expense" || e.entryType === "purchase")
-          .reduce((sum, e) => sum + Number(e.amount), 0);
-        setStats({ earnings, expenses, profit: earnings - expenses });
-        const recent = [...entries]
-          .sort((a, b) => b.entryDate.localeCompare(a.entryDate))
-          .slice(0, 5);
-        setRecentEntries(recent);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  // Extract fetch logic into a reusable function
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const entries = await listCurrentUserLedgerEntries();
+      
+      const earnings = entries
+        .filter((e) => e.entryType === "sale" || e.entryType === "income")
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+
+      const expenses = entries
+        .filter((e) => e.entryType === "expense" || e.entryType === "purchase")
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+
+      setStats({ 
+        earnings, 
+        expenses, 
+        profit: earnings - expenses 
+      });
+
+      const recent = [...entries]
+        .sort((a, b) => b.entryDate.localeCompare(a.entryDate))
+        .slice(0, 5);
+
+      setRecentEntries(recent);
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error);
+    }
   }, []);
 
+  // Initial load
+  useEffect(() => {
+    fetchDashboardData().finally(() => setLoading(false));
+  }, [fetchDashboardData]);
+
+  // Refresh dashboard after successful voice recording
   const handleSave = async (result: VoiceProcessResponse) => {
     if (!result.voiceSessionId) {
       toast({
@@ -84,10 +98,15 @@ export default function DashboardPage() {
 
     try {
       await Promise.all(tasks);
+      
       toast({
         title: "Saved",
         description: `Saved ${tasks.length} ledger entries from voice note.`,
       });
+
+      // Refresh dashboard data (minimal extra API call)
+      await fetchDashboardData();
+
     } catch (error) {
       toast({
         title: "Save failed",
@@ -148,8 +167,12 @@ export default function DashboardPage() {
         {/* Greeting */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Good morning, {user?.name?.split(" ")[0] ?? "there"}! 👋</h1>
-            <p className="text-muted-foreground font-medium">Here's your business overview for today.</p>
+            <h1 className="text-2xl md:text-3xl font-bold">
+              Good morning, {user?.name?.split(" ")[0] ?? "there"}! 👋
+            </h1>
+            <p className="text-muted-foreground font-medium">
+              Here's your business overview for today.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <BrutalButton variant="outline" size="lg" onClick={() => setCallOpen(true)}>
@@ -163,9 +186,30 @@ export default function DashboardPage() {
 
         {/* Stats */}
         <div className="grid sm:grid-cols-3 gap-4">
-          <StatCard title="Earnings" value={stats.earnings} icon={DollarSign} variant="earnings" trend="up" trendValue="12% vs last week" />
-          <StatCard title="Expenses" value={stats.expenses} icon={TrendingDown} variant="expenses" trend="down" trendValue="5% vs last week" />
-          <StatCard title="Profit" value={stats.profit} icon={TrendingUp} variant="profit" trend="up" trendValue="18% vs last week" />
+          <StatCard 
+            title="Earnings" 
+            value={stats.earnings} 
+            icon={DollarSign} 
+            variant="earnings" 
+            trend="up" 
+            trendValue="12% vs last week" 
+          />
+          <StatCard 
+            title="Expenses" 
+            value={stats.expenses} 
+            icon={TrendingDown} 
+            variant="expenses" 
+            trend="down" 
+            trendValue="5% vs last week" 
+          />
+          <StatCard 
+            title="Profit" 
+            value={stats.profit} 
+            icon={TrendingUp} 
+            variant="profit" 
+            trend="up" 
+            trendValue="18% vs last week" 
+          />
         </div>
 
         {/* Insight */}
@@ -175,7 +219,9 @@ export default function DashboardPage() {
           </div>
           <div>
             <h3 className="font-bold">Weekend Boost!</h3>
-            <p className="text-sm text-muted-foreground font-medium">You earn 40% more on weekends. Consider stocking extra on Fridays for maximum profit.</p>
+            <p className="text-sm text-muted-foreground font-medium">
+              You earn 40% more on weekends. Consider stocking extra on Fridays for maximum profit.
+            </p>
           </div>
         </BrutalCard>
 
@@ -184,7 +230,9 @@ export default function DashboardPage() {
           <h2 className="text-xl font-bold mb-3">Recent Activity</h2>
           {recentEntries.length === 0 ? (
             <BrutalCard className="text-center py-8">
-              <p className="text-muted-foreground font-medium">No entries yet. Record your first voice entry!</p>
+              <p className="text-muted-foreground font-medium">
+                No entries yet. Record your first voice entry!
+              </p>
             </BrutalCard>
           ) : (
             <div className="space-y-3">
@@ -192,10 +240,17 @@ export default function DashboardPage() {
                 const isSale = entry.entryType === "sale" || entry.entryType === "income";
                 const amount = Number(entry.amount);
                 return (
-                  <BrutalCard key={entry.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <BrutalCard 
+                    key={entry.id} 
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                  >
                     <div>
-                      <p className="font-bold">{entry.itemName ?? (isSale ? "Voice sale" : "Voice expense")}</p>
-                      <p className="text-sm text-muted-foreground font-medium">{entry.entryDate}</p>
+                      <p className="font-bold">
+                        {entry.itemName ?? (isSale ? "Voice sale" : "Voice expense")}
+                      </p>
+                      <p className="text-sm text-muted-foreground font-medium">
+                        {entry.entryDate}
+                      </p>
                     </div>
                     <div className="flex items-center gap-3">
                       {isSale && <BrutalBadge variant="confirmed">+₹{amount}</BrutalBadge>}
@@ -209,7 +264,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <VoiceRecorderModal open={voiceOpen} onClose={() => setVoiceOpen(false)} onSave={handleSave} />
+      <VoiceRecorderModal 
+        open={voiceOpen} 
+        onClose={() => setVoiceOpen(false)} 
+        onSave={handleSave} 
+      />
 
       <BrutalModal open={callOpen} onClose={() => setCallOpen(false)} title="Call Voice Assistant">
         <div className="space-y-4">
