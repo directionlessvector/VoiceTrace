@@ -2,6 +2,8 @@ import "dotenv/config";
 import express, { Request, Response } from "express";
 import pinoHttp from "pino-http";
 import pino from "pino";
+import express from "express";
+import cors from "cors";
 
 import usersRouter       from "./routes/users.routes";
 import voiceRouter       from "./routes/voice.routes";
@@ -16,7 +18,11 @@ import adminRouter       from "./routes/admin.routes";
 
 const app = express();
 
+app.use(cors({
+	origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : true,
+}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 /* ---------- PINO LOGGER (FINAL CLEAN SETUP) ---------- */
 

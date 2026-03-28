@@ -1,0 +1,46 @@
+import { cn } from "@/lib/utils";
+import { LucideIcon } from "lucide-react";
+
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  icon: LucideIcon;
+  trend?: "up" | "down" | "neutral";
+  trendValue?: string;
+  variant?: "default" | "earnings" | "expenses" | "profit";
+}
+
+export function StatCard({ title, value, icon: Icon, trend, trendValue, variant = "default" }: StatCardProps) {
+  const variantStyles = {
+    default: "bg-card",
+    earnings: "bg-success/10",
+    expenses: "bg-destructive/10",
+    profit: "bg-secondary/10",
+  };
+
+  const iconStyles = {
+    default: "text-foreground",
+    earnings: "text-success",
+    expenses: "text-destructive",
+    profit: "text-secondary",
+  };
+
+  return (
+    <div className={cn("brutal-card p-5", variantStyles[variant])}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-wide text-muted-foreground">{title}</p>
+          <p className="text-3xl font-bold mt-1 font-mono">{typeof value === "number" ? `₹${value.toLocaleString()}` : value}</p>
+          {trend && trendValue && (
+            <p className={cn("text-sm font-bold mt-1", trend === "up" ? "text-success" : trend === "down" ? "text-destructive" : "text-muted-foreground")}>
+              {trend === "up" ? "↑" : trend === "down" ? "↓" : "→"} {trendValue}
+            </p>
+          )}
+        </div>
+        <div className={cn("p-2 brutal-border brutal-shadow-sm", iconStyles[variant])}>
+          <Icon size={24} />
+        </div>
+      </div>
+    </div>
+  );
+}
