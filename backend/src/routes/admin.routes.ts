@@ -3,6 +3,15 @@ import * as ctrl from "../controllers/admin.controller";
 
 const router = Router();
 
+router.post("/login", async (req: Request, res: Response) => {
+  try {
+    const result = await ctrl.loginAdmin(req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(401).json({ error: err.message });
+  }
+});
+
 router.get("/stats", async (_req: Request, res: Response) => {
   try {
     const stats = await ctrl.getVendorStats();

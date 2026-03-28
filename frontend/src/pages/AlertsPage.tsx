@@ -4,7 +4,14 @@ import { BrutalCard } from "@/components/shared/BrutalCard";
 import { BrutalBadge } from "@/components/shared/BrutalBadge";
 import { BrutalButton } from "@/components/shared/BrutalButton";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
-import { listUserAlerts, markAlertRead, markAllAlertsRead, type Alert } from "@/lib/alertsApi";
+import {
+  listUserAlerts,
+  markAlertRead,
+  markAllAlertsRead,
+  createAlertNotification,
+  type Alert,
+  type NotificationChannel,
+} from "@/lib/alertsApi";
 import { AlertTriangle, AlertCircle, Info, ArrowDownUp, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,6 +44,7 @@ export default function AlertsPage() {
   const [filterSeverity, setFilterSeverity] = useState<Alert["severity"] | "all">("all");
   const [filterType, setFilterType] = useState<Alert["alertType"] | "all">("all");
   const [filterRead, setFilterRead] = useState<"all" | "unread" | "read">("all");
+  const [sendingChannel, setSendingChannel] = useState<NotificationChannel | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -103,6 +111,48 @@ export default function AlertsPage() {
 
   const unreadCount = alerts.filter((a) => !a.isRead).length;
 
+  const buildAlertDigest = (): string => {
+    const selected = filtered.slice(0, 8);
+    const lines = selected.map((alert, index) => {
+      return `${index + 1}. [${alert.severity.toUpperCase()}] ${alert.title} | ${ALERT_TYPE_LABELS[alert.alertType]} | ${alert.isRead ? "read" : "unread"}`;
+    });
+
+    return [
+      "VoiceTrace Alerts Digest",
+      `Generated: ${new Date().toLocaleString()}`,
+      `Unread: ${unreadCount}`,
+      "",
+      "Alerts:",
+      ...(lines.length ? lines : ["No alerts available"]),
+    ].join("\n");
+  };
+
+  const handleSendAlerts = async (channel: NotificationChannel) => {
+    try {
+      setSendingChannel(channel);
+      const sent = await createAlertNotification({
+        channel,
+        messageBody: buildAlertDigest(),
+      });
+
+      const destination = sent.destination || "configured destination";
+      const provider = sent.provider ? ` via ${sent.provider}` : "";
+
+      toast({
+        title: `Alerts ${sent.status} for ${channel.toUpperCase()}`,
+        description: `Sent to ${destination}${provider}`,
+      });
+    } catch (error) {
+      toast({
+        title: `Failed to send via ${channel.toUpperCase()}`,
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingChannel(null);
+    }
+  };
+
   if (loading) {
     return <AppLayout><div className="space-y-4"><SkeletonLoader type="text" lines={1} /><SkeletonLoader type="card" /><SkeletonLoader type="card" /></div></AppLayout>;
   }
@@ -116,11 +166,29 @@ export default function AlertsPage() {
             <h1 className="text-2xl md:text-3xl font-bold">Alerts</h1>
             <p className="text-muted-foreground font-medium">Anomalies detected compared to your daily averages.</p>
           </div>
-          {unreadCount > 0 && (
-            <BrutalButton variant="outline" size="sm" onClick={handleMarkAllRead}>
-              Mark all read ({unreadCount})
+          <div className="flex items-center gap-2">
+            <BrutalButton
+              variant="outline"
+              size="sm"
+              onClick={() => handleSendAlerts("whatsapp")}
+              disabled={sendingChannel !== null}
+            >
+              {sendingChannel === "whatsapp" ? "Sending..." : "Send WhatsApp"}
             </BrutalButton>
-          )}
+            <BrutalButton
+              variant="outline"
+              size="sm"
+              onClick={() => handleSendAlerts("sms")}
+              disabled={sendingChannel !== null}
+            >
+              {sendingChannel === "sms" ? "Sending..." : "Send SMS"}
+            </BrutalButton>
+            {unreadCount > 0 && (
+              <BrutalButton variant="outline" size="sm" onClick={handleMarkAllRead}>
+                Mark all read ({unreadCount})
+              </BrutalButton>
+            )}
+          </div>
         </div>
 
         {/* Filters + Sort */}

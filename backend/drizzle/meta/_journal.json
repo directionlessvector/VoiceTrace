@@ -15,6 +15,13 @@
       "when": 1774712825696,
       "tag": "0001_brief_retro_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774789000000,
+      "tag": "0002_profile_image_url",
+      "breakpoints": true
     }
   ]
 }

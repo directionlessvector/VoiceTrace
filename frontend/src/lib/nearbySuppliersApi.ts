@@ -35,7 +35,33 @@ export async function fetchNearbyOsmSuppliers(lat: number, lng: number, q: strin
     radius: "3500",
   });
 
-  return fetchJson<{ ok: boolean; suppliers: OsmSupplier[] }>(`/api/osm-suppliers?${params.toString()}`);
+  const path = `/api/osm-suppliers?${params.toString()}`;
+  const maxAttempts = 3;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fetchJson<{ ok: boolean; suppliers: OsmSupplier[] }>(path);
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : "";
+      const transient =
+        message.includes("Overpass API is currently busy") ||
+        message.includes("Overpass API failed: 5") ||
+        message.includes("Request failed: 502") ||
+        message.includes("Request failed: 503") ||
+        message.includes("Request failed: 504");
+
+      if (!transient || attempt === maxAttempts) {
+        throw error;
+      }
+
+      const backoffMs = attempt * 1200;
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+
+  throw (lastError instanceof Error ? lastError : new Error("Failed to fetch nearby suppliers"));
 }
 
 export async function fetchLowStockItems() {

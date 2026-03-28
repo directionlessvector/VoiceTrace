@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   passwordHash:         text("password_hash"),
   name:                 text("name").notNull(),
   businessName:         text("business_name"),
+  profileImageUrl:      text("profile_image_url"),
   businessType:         businessTypeEnum("business_type"),
   languagePreference:   text("language_preference").default("en"),  // en, hi, mr, gu …
   city:                 text("city"),

@@ -1,6 +1,40 @@
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { eq, desc, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { activityLogs, users } from "../db/schema";
+import { activityLogs, users, adminUsers } from "../db/schema";
+
+const JWT_SECRET = process.env.JWT_SECRET!;
+
+function signAdminToken(adminUserId: string, email: string): string {
+  return jwt.sign({ adminUserId, email, role: "admin" }, JWT_SECRET, { expiresIn: "7d" });
+}
+
+export async function loginAdmin(data: { email: string; password: string }) {
+  if (!data.email || !data.password) {
+    throw new Error("Email and password are required");
+  }
+
+  const [adminUser] = await db.select().from(adminUsers).where(eq(adminUsers.email, data.email.trim()));
+  if (!adminUser) {
+    throw new Error("Invalid admin credentials");
+  }
+
+  const valid = await bcrypt.compare(data.password, adminUser.passwordHash);
+  if (!valid) {
+    throw new Error("Invalid admin credentials");
+  }
+
+  const token = signAdminToken(adminUser.id, adminUser.email);
+  return {
+    token,
+    adminUser: {
+      id: adminUser.id,
+      email: adminUser.email,
+      role: adminUser.role,
+    },
+  };
+}
 
 // ─── Activity Logs ────────────────────────────────────────────────────────────
 

@@ -14,6 +14,21 @@ export type Alert = {
   updatedAt: string;
 };
 
+export type NotificationChannel = "sms" | "whatsapp";
+
+type NotificationCreateResponse = {
+  id: string;
+  userId: string;
+  channel: "sms" | "whatsapp" | "dashboard" | "push_pwa";
+  messageBody: string;
+  alertId: string | null;
+  status: "pending" | "sent" | "delivered" | "failed";
+  createdAt: string;
+  destination?: string;
+  provider?: string;
+  providerMessageId?: string | null;
+};
+
 export async function listUserAlerts(filters?: {
   isRead?: boolean;
   severity?: "info" | "warning" | "critical";
@@ -33,4 +48,22 @@ export async function markAlertRead(id: string): Promise<Alert> {
 export async function markAllAlertsRead(): Promise<void> {
   const userId = await resolveActiveUserId();
   await fetchJson(`/alerts/user/${userId}/read-all`, { method: "PATCH" });
+}
+
+export async function createAlertNotification(input: {
+  channel: NotificationChannel;
+  messageBody: string;
+  alertId?: string;
+}): Promise<NotificationCreateResponse> {
+  const userId = await resolveActiveUserId();
+
+  return fetchJson<NotificationCreateResponse>("/alerts/notifications", {
+    method: "POST",
+    body: JSON.stringify({
+      userId,
+      channel: input.channel,
+      messageBody: input.messageBody,
+      alertId: input.alertId,
+    }),
+  });
 }

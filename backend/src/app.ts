@@ -18,6 +18,7 @@ import suppliersRouter   from "./routes/suppliers.routes";
 import osmSuppliersRouter from "./routes/osm-suppliers.routes";
 import anomaliesRouter   from "./routes/anomalies.routes";
 import intelligenceRouter from "./routes/intelligence.routes";
+import insightsRouter    from "./routes/insights.routes";
 import alertsRouter      from "./routes/alerts.routes";
 import adminRouter       from "./routes/admin.routes";
 
@@ -28,6 +29,39 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use((req: Request, res: Response, next) => {
+  const startedAt = Date.now();
+
+  logger.info(
+    {
+      event: "request_start",
+      method: req.method,
+      path: req.originalUrl,
+      query: req.query,
+      params: req.params,
+      body: req.body,
+    },
+    `--> ${req.method} ${req.originalUrl}`,
+  );
+
+  res.on("finish", () => {
+    const durationMs = Date.now() - startedAt;
+
+    logger.info(
+      {
+        event: "request_end",
+        method: req.method,
+        path: req.originalUrl,
+        statusCode: res.statusCode,
+        durationMs,
+      },
+      `<-- ${req.method} ${req.originalUrl} ${res.statusCode} (${durationMs}ms)`,
+    );
+  });
+
+  next();
+});
 
 /* ---------- PINO LOGGER (FINAL CLEAN SETUP) ---------- */
 
@@ -98,6 +132,7 @@ app.use("/suppliers",    suppliersRouter);
 app.use("/api/osm-suppliers", osmSuppliersRouter);
 app.use("/anomalies",    anomaliesRouter);
 app.use("/intelligence", intelligenceRouter);
+app.use("/api/insights", insightsRouter);
 app.use("/alerts",       alertsRouter);
 app.use("/admin",        adminRouter);
 

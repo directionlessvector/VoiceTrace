@@ -32,6 +32,7 @@ export async function updateUser(
   data: Partial<{
     name: string;
     businessName: string;
+    profileImageUrl: string;
     businessType: "retail" | "wholesale" | "service" | "agriculture";
     languagePreference: string;
     city: string;

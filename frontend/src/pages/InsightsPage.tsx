@@ -2,21 +2,74 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/layouts/AppLayout";
 import { BrutalCard } from "@/components/shared/BrutalCard";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
-import { weeklyInsights, insightMessages } from "@/data/mockData";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import {
+  fetchWeeklyInsights,
+  type WeeklyDailyPoint,
+  type WeeklyInsight,
+  type WeeklyTopItemPoint,
+} from "@/lib/insightsApi";
+import { Lightbulb, TrendingUp, TrendingDown, PackageSearch, CalendarDays } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis } from "recharts";
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+
+const chartConfig = {
+  sales: { label: "Sales", color: "hsl(var(--primary))" },
+  expenses: { label: "Expenses", color: "hsl(var(--destructive))" },
+  quantity: { label: "Units Sold", color: "hsl(var(--accent))" },
+};
 
 export default function InsightsPage() {
   const [loading, setLoading] = useState(true);
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 1000); return () => clearTimeout(t); }, []);
+  const [error, setError] = useState<string | null>(null);
+  const [insights, setInsights] = useState<WeeklyInsight[]>([]);
+  const [dailySeries, setDailySeries] = useState<WeeklyDailyPoint[]>([]);
+  const [topItems, setTopItems] = useState<WeeklyTopItemPoint[]>([]);
 
-  const weeklyTotal = weeklyInsights.reduce((a, d) => a + d.earnings, 0);
-  const weeklyExpenses = weeklyInsights.reduce((a, d) => a + d.expenses, 0);
-  const monthlyTotal = weeklyTotal * 4;
-  const monthlyExpenses = weeklyExpenses * 4;
+  useEffect(() => {
+    let mounted = true;
 
-  const insightIcons = { positive: TrendingUp, negative: TrendingDown, neutral: Minus };
-  const insightColors = { positive: "success" as const, negative: "destructive" as const, neutral: "secondary" as const };
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await fetchWeeklyInsights();
+        if (!mounted) return;
+        setInsights(Array.isArray(result.insights) ? result.insights : []);
+        setDailySeries(Array.isArray(result.charts.dailySeries) ? result.charts.dailySeries : []);
+        setTopItems(Array.isArray(result.charts.topItems) ? result.charts.topItems : []);
+      } catch (err) {
+        if (!mounted) return;
+        setError(err instanceof Error ? err.message : "Failed to load weekly insights");
+        setInsights([]);
+        setDailySeries([]);
+        setTopItems([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const insightIconByType: Record<WeeklyInsight["type"], typeof Lightbulb> = {
+    top_item: Lightbulb,
+    best_day: CalendarDays,
+    expense_trend: TrendingDown,
+    sales_trend: TrendingUp,
+    stock_out_pattern: PackageSearch,
+    not_enough_data: Lightbulb,
+  };
+
+  const insightTitleByType: Record<WeeklyInsight["type"], string> = {
+    top_item: "Top Item Pattern",
+    best_day: "Best Day Pattern",
+    expense_trend: "Expense Trend",
+    sales_trend: "Sales Trend",
+    stock_out_pattern: "Stock Pattern",
+    not_enough_data: "Data Status",
+  };
 
   if (loading) {
     return <AppLayout><div className="space-y-4"><SkeletonLoader type="text" lines={1} /><SkeletonLoader type="card" /><SkeletonLoader type="card" /></div></AppLayout>;
@@ -27,62 +80,85 @@ export default function InsightsPage() {
       <div className="space-y-6">
         <h1 className="text-2xl md:text-3xl font-bold">Insights</h1>
 
-        {/* Chart */}
-        <BrutalCard>
-          <h3 className="font-bold mb-4">Weekly Trends</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyInsights}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="day" tick={{ fontWeight: 700, fontSize: 12 }} />
-                <YAxis tick={{ fontWeight: 700, fontSize: 12 }} />
-                <Tooltip contentStyle={{ border: "3px solid #000", borderRadius: "4px", fontWeight: 700 }} />
-                <Bar dataKey="earnings" fill="hsl(142, 76%, 36%)" name="Earnings" />
-                <Bar dataKey="expenses" fill="hsl(0, 84%, 60%)" name="Expenses" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </BrutalCard>
-
-        {/* Insight Cards */}
-        <div className="grid sm:grid-cols-2 gap-4">
-          {insightMessages.map((insight) => {
-            const Icon = insightIcons[insight.type];
-            return (
-              <BrutalCard key={insight.id} highlight={insightColors[insight.type]}>
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-sm brutal-border flex items-center justify-center shrink-0 bg-${insightColors[insight.type]}/10`}>
-                    <Icon size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold">{insight.title}</h3>
-                    <p className="text-sm text-muted-foreground font-medium mt-1">{insight.message}</p>
-                  </div>
-                </div>
-              </BrutalCard>
-            );
-          })}
-        </div>
-
-        {/* Summaries */}
-        <div className="grid sm:grid-cols-2 gap-4">
-          <BrutalCard highlight="secondary">
-            <h3 className="font-bold text-lg mb-3">Weekly Summary</h3>
-            <div className="space-y-2 font-mono text-sm">
-              <div className="flex justify-between"><span>Total Earnings</span><span className="font-bold text-success">₹{weeklyTotal.toLocaleString()}</span></div>
-              <div className="flex justify-between"><span>Total Expenses</span><span className="font-bold text-destructive">₹{weeklyExpenses.toLocaleString()}</span></div>
-              <div className="border-t-[3px] border-foreground pt-2 flex justify-between"><span>Net Profit</span><span className="font-bold text-secondary">₹{(weeklyTotal - weeklyExpenses).toLocaleString()}</span></div>
-            </div>
+        {error && (
+          <BrutalCard highlight="danger">
+            <p className="text-sm font-medium text-destructive">{error}</p>
           </BrutalCard>
-          <BrutalCard highlight="primary">
-            <h3 className="font-bold text-lg mb-3">Monthly Estimate</h3>
-            <div className="space-y-2 font-mono text-sm">
-              <div className="flex justify-between"><span>Total Earnings</span><span className="font-bold text-success">₹{monthlyTotal.toLocaleString()}</span></div>
-              <div className="flex justify-between"><span>Total Expenses</span><span className="font-bold text-destructive">₹{monthlyExpenses.toLocaleString()}</span></div>
-              <div className="border-t-[3px] border-foreground pt-2 flex justify-between"><span>Net Profit</span><span className="font-bold text-secondary">₹{(monthlyTotal - monthlyExpenses).toLocaleString()}</span></div>
-            </div>
+        )}
+
+        {insights.length === 0 ? (
+          <BrutalCard>
+            <h3 className="font-bold text-lg">Start recording your daily business to unlock insights.</h3>
+            <p className="text-sm text-muted-foreground mt-2 font-medium">
+              Weekly patterns appear after enough daily entries are captured.
+            </p>
           </BrutalCard>
-        </div>
+        ) : (
+          <>
+            {dailySeries.length > 0 && (
+              <div className="grid lg:grid-cols-2 gap-4">
+                <BrutalCard>
+                  <h3 className="font-bold text-lg mb-3">Sales vs Expenses (Last 7 Days)</h3>
+                  <ChartContainer config={chartConfig} className="h-[280px] w-full">
+                    <LineChart data={dailySeries} margin={{ left: 8, right: 8 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="day" tickLine={false} axisLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Line
+                        type="monotone"
+                        dataKey="sales"
+                        stroke="var(--color-sales)"
+                        strokeWidth={3}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="expenses"
+                        stroke="var(--color-expenses)"
+                        strokeWidth={3}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ChartContainer>
+                </BrutalCard>
+
+                <BrutalCard>
+                  <h3 className="font-bold text-lg mb-3">Top Selling Items</h3>
+                  <ChartContainer config={chartConfig} className="h-[280px] w-full">
+                    <BarChart data={topItems} margin={{ left: 8, right: 8 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="itemName" tickLine={false} axisLine={false} interval={0} angle={-18} textAnchor="end" height={64} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="quantity" fill="var(--color-quantity)" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </BrutalCard>
+              </div>
+            )}
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              {insights.map((insight, idx) => {
+                const Icon = insightIconByType[insight.type];
+                return (
+                  <BrutalCard key={`${insight.type}-${idx}`} highlight="secondary">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-sm brutal-border flex items-center justify-center shrink-0 bg-primary/10">
+                        <Icon size={20} className="text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold">{insightTitleByType[insight.type]}</h3>
+                        <p className="text-sm text-muted-foreground font-medium mt-1">{insight.message}</p>
+                      </div>
+                    </div>
+                  </BrutalCard>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
     </AppLayout>
   );

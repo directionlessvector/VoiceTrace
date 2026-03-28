@@ -99,7 +99,12 @@ export default function NearbySuppliersPage() {
       const response = await fetchNearbyOsmSuppliers(coords.lat, coords.lng, searchItem.trim());
       setNearbySuppliers(response.suppliers);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to fetch nearby suppliers");
+      const message = e instanceof Error ? e.message : "Failed to fetch nearby suppliers";
+      if (message.includes("Overpass API is currently busy")) {
+        setError("Nearby supplier servers are busy right now. We already retried automatically. Please tap Refresh in a few seconds.");
+      } else {
+        setError(message);
+      }
       setNearbySuppliers([]);
     } finally {
       setNearbyLoading(false);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppLayout } from "@/layouts/AppLayout";
 import { StatCard } from "@/components/shared/StatCard";
 import { BrutalCard } from "@/components/shared/BrutalCard";
@@ -7,14 +7,61 @@ import { BrutalButton } from "@/components/shared/BrutalButton";
 import { BrutalModal } from "@/components/shared/BrutalModal";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
 import { adminVendors } from "@/data/mockData";
-import { Users, UserCheck, Search, Eye } from "lucide-react";
+import { Users, UserCheck, Search, Eye, QrCode, Camera, CameraOff, CheckCircle2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import jsQR from "jsqr";
+
+type ReportQrData = {
+  reportId: string;
+  timestamp: string;
+  fromDate?: string;
+  toDate?: string;
+  totalEarnings?: number;
+  totalExpenses?: number;
+  profit?: number;
+  url?: string;
+};
+
+function parseReportQrPayload(raw: string): ReportQrData | null {
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const reportId = String(parsed.reportId ?? "").trim();
+    const timestamp = String(parsed.timestamp ?? "").trim();
+    if (!reportId || !timestamp) return null;
+
+    return {
+      reportId,
+      timestamp,
+      fromDate: parsed.fromDate ? String(parsed.fromDate) : undefined,
+      toDate: parsed.toDate ? String(parsed.toDate) : undefined,
+      totalEarnings: parsed.totalEarnings !== undefined ? Number(parsed.totalEarnings) : undefined,
+      totalExpenses: parsed.totalExpenses !== undefined ? Number(parsed.totalExpenses) : undefined,
+      profit: parsed.profit !== undefined ? Number(parsed.profit) : undefined,
+      url: parsed.url ? String(parsed.url) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function formatCurrency(value: number | undefined) {
+  if (value === undefined || Number.isNaN(value)) return "-";
+  return `Rs ${Math.round(value).toLocaleString()}`;
+}
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
   const [selectedVendor, setSelectedVendor] = useState<(typeof adminVendors)[0] | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [verifiedReport, setVerifiedReport] = useState<ReportQrData | null>(null);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => { const t = setTimeout(() => setLoading(false), 1000); return () => clearTimeout(t); }, []);
 
@@ -35,6 +82,94 @@ export default function AdminPage() {
       ]
     : [];
 
+  const stopScanner = () => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsScanning(false);
+  };
+
+  useEffect(() => {
+    if (!isScanning) return;
+
+    let active = true;
+
+    const tick = () => {
+      if (!active) return;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const qr = jsQR(image.data, image.width, image.height);
+          if (qr?.data) {
+            const parsed = parseReportQrPayload(qr.data);
+            if (parsed) {
+              setVerifiedReport(parsed);
+              setScanError(null);
+            } else {
+              setScanError("QR scanned but payload is not a valid VoiceTrace report.");
+            }
+            stopScanner();
+            return;
+          }
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    const start = async () => {
+      try {
+        setScanError(null);
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+
+        if (!active) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+
+        tick();
+      } catch (error) {
+        setScanError(error instanceof Error ? error.message : "Unable to start scanner.");
+        stopScanner();
+      }
+    };
+
+    void start();
+
+    return () => {
+      active = false;
+      stopScanner();
+    };
+  }, [isScanning]);
+
   if (loading) {
     return <AppLayout><div className="space-y-4"><SkeletonLoader type="text" lines={1} /><div className="grid sm:grid-cols-2 gap-4"><SkeletonLoader type="stat" /><SkeletonLoader type="stat" /></div><SkeletonLoader type="card" /></div></AppLayout>;
   }
@@ -49,6 +184,102 @@ export default function AdminPage() {
           <StatCard title="Total Vendors" value={totalVendors.toString()} icon={Users} />
           <StatCard title="Active Users" value={activeVendors.toString()} icon={UserCheck} variant="earnings" />
         </div>
+
+        {/* Report QR Verification */}
+        <BrutalCard className="p-5">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <QrCode size={20} className="text-primary" />
+              <h2 className="text-xl font-bold">Report QR Verification</h2>
+            </div>
+            {!isScanning ? (
+              <BrutalButton
+                variant="primary"
+                onClick={() => {
+                  setVerifiedReport(null);
+                  setScanError(null);
+                  setIsScanning(true);
+                }}
+              >
+                <Camera size={16} /> Start Scanner
+              </BrutalButton>
+            ) : (
+              <BrutalButton variant="danger" onClick={stopScanner}>
+                <CameraOff size={16} /> Stop Scanner
+              </BrutalButton>
+            )}
+          </div>
+
+          {isScanning && (
+            <div className="space-y-3">
+              <div className="brutal-border overflow-hidden bg-black/80">
+                <video ref={videoRef} className="w-full max-h-[360px] object-cover" playsInline muted />
+                <canvas ref={canvasRef} className="hidden" />
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">Point camera at the QR code shown at the end of report PDF.</p>
+            </div>
+          )}
+
+          {scanError && (
+            <div className="mt-4 brutal-border p-3 border-destructive bg-destructive/10">
+              <p className="text-sm font-bold text-destructive">{scanError}</p>
+            </div>
+          )}
+
+          {verifiedReport && (
+            <div className="mt-4 space-y-4">
+              <div className="brutal-border p-6 bg-blue-50 text-center">
+                <CheckCircle2 size={76} className="mx-auto text-blue-600" />
+                <p className="mt-3 text-3xl font-black tracking-tight text-blue-700">VERIFIED</p>
+                <p className="text-lg font-bold text-blue-700">Verified by Vyaapar Saathi</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="brutal-border p-3">
+                  <p className="text-xs font-bold uppercase text-muted-foreground">Report ID</p>
+                  <p className="font-bold break-all">{verifiedReport.reportId}</p>
+                </div>
+                <div className="brutal-border p-3">
+                  <p className="text-xs font-bold uppercase text-muted-foreground">Generated At</p>
+                  <p className="font-bold">{new Date(verifiedReport.timestamp).toLocaleString()}</p>
+                </div>
+                <div className="brutal-border p-3">
+                  <p className="text-xs font-bold uppercase text-muted-foreground">Date Range</p>
+                  <p className="font-bold">{verifiedReport.fromDate && verifiedReport.toDate ? `${verifiedReport.fromDate} to ${verifiedReport.toDate}` : "-"}</p>
+                </div>
+                <div className="brutal-border p-3">
+                  <p className="text-xs font-bold uppercase text-muted-foreground">Report Source</p>
+                  <p className="font-bold break-all">{verifiedReport.url || "-"}</p>
+                </div>
+                <div className="brutal-border p-3">
+                  <p className="text-xs font-bold uppercase text-muted-foreground">Total Earnings</p>
+                  <p className="font-bold text-success">{formatCurrency(verifiedReport.totalEarnings)}</p>
+                </div>
+                <div className="brutal-border p-3">
+                  <p className="text-xs font-bold uppercase text-muted-foreground">Total Expenses</p>
+                  <p className="font-bold text-destructive">{formatCurrency(verifiedReport.totalExpenses)}</p>
+                </div>
+                <div className="brutal-border p-3 md:col-span-2">
+                  <p className="text-xs font-bold uppercase text-muted-foreground">Net Profit</p>
+                  <p className="font-bold text-primary">{formatCurrency(verifiedReport.profit)}</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <BrutalButton
+                  variant="outline"
+                  onClick={() => {
+                    setVerifiedReport(null);
+                    setScanError(null);
+                    setIsScanning(true);
+                  }}
+                >
+                  <QrCode size={16} /> Scan Another QR
+                </BrutalButton>
+              </div>
+            </div>
+          )}
+        </BrutalCard>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
