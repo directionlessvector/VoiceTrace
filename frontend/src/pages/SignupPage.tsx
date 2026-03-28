@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BrutalButton } from "@/components/shared/BrutalButton";
 import { BrutalInput, BrutalSelect } from "@/components/shared/BrutalInput";
+import { FloatingCoin } from "@/components/shared/FloatingCoin";
 import { Mic } from "lucide-react";
 
 export default function SignupPage() {
@@ -30,8 +31,18 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="relative overflow-hidden min-h-screen bg-background flex items-center justify-center p-4">
+      
+      {/* Massive Responsive Ambient Coins */}
+      <FloatingCoin className="text-[120px] md:text-[320px] -top-[5%] md:-top-[15%] -left-[10%] md:-left-[5%]" delay={0.3} rotation={-30} shadowX={0.08} shadowY={0.15} />
+      <FloatingCoin className="text-[90px] md:text-[230px] top-[40%] md:top-[45%] -left-[5%] md:left-[2%]" delay={1.6} rotation={15} shadowX={-0.12} shadowY={0.12} />
+      <FloatingCoin className="text-[100px] md:text-[180px] -bottom-[5%] md:-bottom-[10%] left-[8%] md:left-[15%]" delay={0.9} rotation={-10} shadowX={-0.1} shadowY={0.15} />
+      
+      <FloatingCoin className="text-[90px] md:text-[160px] top-[8%] md:top-[12%] right-[5%] md:right-[15%]" delay={1.2} rotation={20} shadowX={0.06} shadowY={0.12} />
+      <FloatingCoin className="text-[140px] md:text-[280px] top-[50%] md:top-[40%] -right-[15%] md:-right-[8%]" delay={2.7} rotation={-25} shadowX={-0.15} shadowY={0.1} />
+      <FloatingCoin className="text-[110px] md:text-[240px] -bottom-[5%] md:-bottom-[12%] -right-[5%] md:right-[2%]" delay={0.5} rotation={5} shadowX={-0.08} shadowY={0.14} />
+
+      <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2">
             <div className="w-12 h-12 bg-primary rounded-sm brutal-border brutal-shadow flex items-center justify-center">
