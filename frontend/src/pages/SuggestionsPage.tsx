@@ -84,41 +84,6 @@ function toWeatherBadgeVariant(confidence: WeatherConfidence): "confirmed" | "wa
   return "danger";
 }
 
-function pickBestDailySlots(
-  list: Array<{
-    dt_txt: string;
-    main: { temp: number };
-    pop?: number;
-    weather?: Array<{ main?: string; description?: string; icon?: string }>;
-  }>
-): ForecastDay[] {
-  const byDate = new Map<string, typeof list>();
-
-  for (const row of list) {
-    const date = row.dt_txt?.split(" ")[0];
-    if (!date) continue;
-    byDate.set(date, [...(byDate.get(date) ?? []), row]);
-  }
-
-  return [...byDate.entries()]
-    .slice(0, 3)
-    .map(([date, rows]) => {
-      const best = rows.reduce((closest, curr) => {
-        const currHour = Number(curr.dt_txt.split(" ")[1]?.split(":")[0] ?? 12);
-        const bestHour = Number(closest.dt_txt.split(" ")[1]?.split(":")[0] ?? 12);
-        return Math.abs(currHour - 12) < Math.abs(bestHour - 12) ? curr : closest;
-      }, rows[0]);
-
-      return {
-        date,
-        tempC: Math.round(best.main.temp),
-        rainProbability: Math.round((best.pop ?? 0) * 100),
-        condition: best.weather?.[0]?.main ?? "Clear",
-        icon: best.weather?.[0]?.icon ?? "01d",
-      };
-    });
-}
-
 function buildWeatherSuggestions(forecast: ForecastDay[]): WeatherSuggestion[] {
   const suggestionsOut: WeatherSuggestion[] = [];
 
@@ -197,7 +162,55 @@ export default function SuggestionsPage() {
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const { toast } = useToast();
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 1000); return () => clearTimeout(t); }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 1000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const enriched = suggestions
+    .map((s) => {
+      const delta = s.suggestedQty - s.currentQty;
+      const stockOutRisk = s.currentQty <= 3 || /sold out|runs out/i.test(s.reason);
+      const trend = inferTrend(s.reason, s.currentQty, s.suggestedQty);
+      const confidence = inferConfidence(s.reason, delta, stockOutRisk);
+      const highDemand = trend === "increasing" && delta >= 4;
+      const priority =
+        (stockOutRisk ? 100 : 0) +
+        (highDemand ? 40 : 0) +
+        (confidence === "high" ? 20 : confidence === "medium" ? 10 : 0) +
+        Math.max(0, delta);
+
+      return {
+        ...s,
+        delta,
+        stockOutRisk,
+        trend,
+        confidence,
+        highDemand,
+        priority,
+      };
+    })
+    .sort((a, b) => b.priority - a.priority);
+
+  const increasingCount = enriched.filter((item) => item.trend === "increasing").length;
+  const stockOutCount = enriched.filter((item) => item.stockOutRisk).length;
+  const topPriority = enriched[0];
+
+  const handleAcceptAll = () => {
+    toast({
+      title: "Suggestions accepted",
+      description: `Applied ${enriched.length} stock recommendations in priority order.`,
+    });
+  };
+
+  const handleManualEdit = () => {
+    setManualMode((prev) => !prev);
+    toast({
+      title: manualMode ? "Manual mode off" : "Manual mode on",
+      description: manualMode ? "Back to AI suggestions view." : "You can now fine-tune quantities manually.",
+    });
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -257,59 +270,23 @@ export default function SuggestionsPage() {
     };
   }, []);
 
-  const enriched = suggestions
-    .map((s) => {
-      const delta = s.suggestedQty - s.currentQty;
-      const stockOutRisk = s.currentQty <= 3 || /sold out|runs out/i.test(s.reason);
-      const trend = inferTrend(s.reason, s.currentQty, s.suggestedQty);
-      const confidence = inferConfidence(s.reason, delta, stockOutRisk);
-      const highDemand = trend === "increasing" && delta >= 4;
-      const priority =
-        (stockOutRisk ? 100 : 0) +
-        (highDemand ? 40 : 0) +
-        (confidence === "high" ? 20 : confidence === "medium" ? 10 : 0) +
-        Math.max(0, delta);
-
-      return {
-        ...s,
-        delta,
-        stockOutRisk,
-        trend,
-        confidence,
-        highDemand,
-        priority,
-      };
-    })
-    .sort((a, b) => b.priority - a.priority);
-
-  const increasingCount = enriched.filter((item) => item.trend === "increasing").length;
-  const stockOutCount = enriched.filter((item) => item.stockOutRisk).length;
-  const topPriority = enriched[0];
-
-  const handleAcceptAll = () => {
-    toast({
-      title: "Suggestions accepted",
-      description: `Applied ${enriched.length} stock recommendations in priority order.`,
-    });
-  };
-
-  const handleManualEdit = () => {
-    setManualMode((prev) => !prev);
-    toast({
-      title: manualMode ? "Manual mode off" : "Manual mode on",
-      description: manualMode ? "Back to AI suggestions view." : "You can now fine-tune quantities manually.",
-    });
-  };
-
   if (loading) {
-    return <AppLayout><div className="space-y-4"><SkeletonLoader type="text" lines={1} /><SkeletonLoader type="card" /><SkeletonLoader type="card" /></div></AppLayout>;
+    return (
+      <AppLayout>
+        <div className="space-y-4">
+          <SkeletonLoader type="text" lines={1} />
+          <SkeletonLoader type="card" />
+          <SkeletonLoader type="card" />
+        </div>
+      </AppLayout>
+    );
   }
 
   return (
     <AppLayout>
       <div className="space-y-6">
         <h1 className="text-2xl md:text-3xl font-bold">Stock Suggestions</h1>
-        <p className="text-muted-foreground font-medium">AI-powered recommendations based on your sales patterns.</p>
+        <p className="text-muted-foreground font-medium">AI suggestions enriched with weather-driven recommendations.</p>
 
         <BrutalCard className="p-4" highlight="primary">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -333,7 +310,7 @@ export default function SuggestionsPage() {
                 <p className="text-sm font-bold text-destructive">Could not load weather suggestions</p>
                 <p className="text-sm text-muted-foreground">{weatherError}</p>
                 <p className="text-xs font-medium text-muted-foreground">
-                  Check network access and optional `VITE_WEATHER_LAT` / `VITE_WEATHER_LON` values in frontend env.
+                  Check network access and optional VITE_WEATHER_LAT / VITE_WEATHER_LON values in frontend env.
                 </p>
               </div>
             )}
@@ -350,7 +327,7 @@ export default function SuggestionsPage() {
                       />
                       <div>
                         <p className="text-sm font-bold">{day.date}</p>
-                        <p className="text-xs text-muted-foreground font-medium">{day.tempC}°C • Rain {day.rainProbability}%</p>
+                        <p className="text-xs text-muted-foreground font-medium">{day.tempC} C | Rain {day.rainProbability}%</p>
                       </div>
                     </div>
                   ))}
@@ -358,7 +335,7 @@ export default function SuggestionsPage() {
 
                 <div className="space-y-3 mt-4">
                   {weatherSuggestions.slice(0, 4).map((w, idx) => (
-                    <div key={`${w.item}-top-${idx}`} className="brutal-card p-4">
+                    <div key={`${w.item}-${idx}`} className="brutal-card p-4">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-start gap-3">
                           <img
@@ -509,7 +486,6 @@ export default function SuggestionsPage() {
             </div>
           </div>
         </BrutalCard>
-
       </div>
     </AppLayout>
   );
