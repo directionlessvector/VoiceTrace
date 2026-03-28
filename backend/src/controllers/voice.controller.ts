@@ -14,7 +14,7 @@ export async function createVoiceSession(data: {
   fileSizeBytes?: number;
   durationSeconds?: number;
   recordedAt?: Date;
-  sessionType?: "ledger_entry" | "stock_update" | "customer_update" | "query" | "general";
+  sessionType?: "ledger_entry" | "ledger_upload" | "stock_update" | "customer_update" | "query" | "general";
 }) {
   const [session] = await db.insert(voiceSessions).values(data).returning();
   return session;

@@ -1,7 +1,11 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import { desc, eq } from "drizzle-orm";
 import * as ctrl from "../controllers/voice.controller";
 import { processVoiceAudio } from "../services/voice-processing.service";
+import { uploadAudioToCloudinary } from "../services/cloudinary-upload.service";
+import { db } from "../db/client";
+import { users } from "../db/schema";
 
 const router = Router();
 const upload = multer({
@@ -9,11 +13,56 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
 });
 
+async function resolveUserId(req: Request): Promise<string | null> {
+  const fromBody = typeof req.body?.userId === "string" ? req.body.userId.trim() : "";
+  if (fromBody) return fromBody;
+
+  const fromHeader = typeof req.headers["x-user-id"] === "string" ? req.headers["x-user-id"].trim() : "";
+  if (fromHeader) return fromHeader;
+
+  const fromEnv = process.env.VOICE_DEFAULT_USER_ID?.trim();
+  if (fromEnv) {
+    const [defaultUser] = await db.select({ id: users.id }).from(users).where(eq(users.id, fromEnv)).limit(1);
+    if (defaultUser?.id) return defaultUser.id;
+  }
+
+  const [latestUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .orderBy(desc(users.createdAt))
+    .limit(1);
+
+  return latestUser?.id ?? null;
+}
+
 router.post("/process", upload.single("audio"), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "audio file is required (form field: audio)" });
     }
+
+    const userId = await resolveUserId(req);
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required (form field userId or x-user-id header), and no default user is available" });
+    }
+
+    const cloudinaryAsset = await uploadAudioToCloudinary({
+      buffer: req.file.buffer,
+      originalFilename: req.file.originalname,
+    });
+
+    const session = await ctrl.createVoiceSession({
+      userId,
+      cloudinaryUrl: cloudinaryAsset.cloudinaryUrl,
+      cloudinaryPublicId: cloudinaryAsset.cloudinaryPublicId,
+      cloudinaryFormat: cloudinaryAsset.cloudinaryFormat,
+      cloudinaryVersion: cloudinaryAsset.cloudinaryVersion,
+      mimeType: req.file.mimetype,
+      fileSizeBytes: cloudinaryAsset.fileSizeBytes ?? req.file.size,
+      durationSeconds: cloudinaryAsset.durationSeconds,
+      recordedAt: req.body?.recordedAt ? new Date(req.body.recordedAt) : undefined,
+      sessionType: "ledger_entry",
+    });
 
     const result = await processVoiceAudio({
       buffer: req.file.buffer,
@@ -21,8 +70,19 @@ router.post("/process", upload.single("audio"), async (req: Request, res: Respon
       mimeType: req.file.mimetype,
     });
 
+    await ctrl.updateTranscription(session.id, {
+      transcriptionRaw: result.transcript,
+      transcriptionClean: result.transcript,
+      languageDetected: result.languageDetected,
+      processingStatus: "parsed",
+    });
+
     res.json({
       ok: true,
+      voiceSessionId: session.id,
+      cloudinary_url: cloudinaryAsset.cloudinaryUrl,
+      transcription: result.transcript,
+      extractedData: result.structured,
       transcript: result.transcript,
       languageDetected: result.languageDetected,
       structured: result.structured,

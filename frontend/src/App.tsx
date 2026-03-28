@@ -8,6 +8,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import DashboardPage from "./pages/DashboardPage";
 import LedgerPage from "./pages/LedgerPage";
+import UploadLedgerPage from "./pages/UploadLedgerPage";
 import InsightsPage from "./pages/InsightsPage";
 import SuggestionsPage from "./pages/SuggestionsPage";
 import ReportsPage from "./pages/ReportsPage";
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/ledger" element={<LedgerPage />} />
+          <Route path="/upload-ledger" element={<UploadLedgerPage />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/suggestions" element={<SuggestionsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
