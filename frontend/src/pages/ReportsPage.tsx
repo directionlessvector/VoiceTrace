@@ -3,7 +3,8 @@ import { AppLayout } from "@/layouts/AppLayout";
 import { BrutalCard } from "@/components/shared/BrutalCard";
 import { BrutalButton } from "@/components/shared/BrutalButton";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
-import { currentUser, ledgerEntries, weeklyInsights } from "@/data/mockData";
+import { listCurrentUserLedgerEntries, type LedgerEntry } from "@/lib/ledgerApi";
+import { useAuth } from "@/contexts/AuthContext";
 import { Download, FileText, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
@@ -52,15 +53,12 @@ function loadImageElement(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-function buildTopItems() {
+function buildTopItems(entries: LedgerEntry[]) {
   const totals = new Map<string, number>();
-  for (const entry of ledgerEntries) {
-    for (const item of entry.items) {
-      const [name, amountChunk] = item.split("-");
-      const amount = Number((amountChunk || "0").replace(/[^\d.-]/g, ""));
-      const key = (name || "Unknown").trim();
-      totals.set(key, (totals.get(key) || 0) + (Number.isFinite(amount) ? amount : 0));
-    }
+  for (const entry of entries) {
+    if (entry.entryType !== "sale" && entry.entryType !== "income") continue;
+    const key = entry.itemName?.trim() || "Unknown";
+    totals.set(key, (totals.get(key) || 0) + Number(entry.amount));
   }
   return [...totals.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -68,15 +66,12 @@ function buildTopItems() {
     .map(([name, total]) => `${name}: ₹${Math.round(total)}`);
 }
 
-function buildExpenseBreakdown() {
+function buildExpenseBreakdown(entries: LedgerEntry[]) {
   const totals = new Map<string, number>();
-  for (const entry of ledgerEntries) {
-    for (const exp of entry.expenseBreakdown) {
-      const [name, amountChunk] = exp.split("-");
-      const amount = Number((amountChunk || "0").replace(/[^\d.-]/g, ""));
-      const key = (name || "Unknown").trim();
-      totals.set(key, (totals.get(key) || 0) + (Number.isFinite(amount) ? amount : 0));
-    }
+  for (const entry of entries) {
+    if (entry.entryType !== "expense" && entry.entryType !== "purchase") continue;
+    const key = entry.itemName?.trim() || "Unknown";
+    totals.set(key, (totals.get(key) || 0) + Number(entry.amount));
   }
   return [...totals.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -84,12 +79,19 @@ function buildExpenseBreakdown() {
     .map(([name, total]) => `${name}: ₹${Math.round(total)}`);
 }
 
-function buildInsights(totalEarnings: number, totalExpenses: number, profit: number): string[] {
+function buildInsights(
+  totalEarnings: number,
+  totalExpenses: number,
+  profit: number,
+  weekly: Array<{ day: string; earnings: number; expenses: number }>
+): string[] {
   const margin = totalEarnings > 0 ? (profit / totalEarnings) * 100 : 0;
-  const bestDay = [...weeklyInsights].sort((a, b) => b.earnings - a.earnings)[0];
+  const bestDay = [...weekly].sort((a, b) => b.earnings - a.earnings)[0];
   return [
     `Net margin is ${margin.toFixed(1)}% for this period.`,
-    `Highest earning day: ${bestDay.day} (₹${bestDay.earnings.toLocaleString()}).`,
+    bestDay
+      ? `Highest earning day: ${bestDay.day} (₹${bestDay.earnings.toLocaleString()}).`
+      : "No daily data available yet.",
     totalExpenses > totalEarnings * 0.6
       ? "Expenses are relatively high. Review purchase and transport costs."
       : "Expense ratio is healthy. Continue current cost discipline.",
@@ -97,17 +99,65 @@ function buildInsights(totalEarnings: number, totalExpenses: number, profit: num
 }
 
 export default function ReportsPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<"Weekly" | "Monthly" | null>(null);
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 1000); return () => clearTimeout(t); }, []);
+  const [entries, setEntries] = useState<LedgerEntry[]>([]);
+  const [allTimeEarnings, setAllTimeEarnings] = useState(0);
+  const [allTimeExpenses, setAllTimeExpenses] = useState(0);
+  const [allTimeProfit, setAllTimeProfit] = useState(0);
+  const [weeklyInsights, setWeeklyInsights] = useState<Array<{ day: string; earnings: number; expenses: number }>>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await listCurrentUserLedgerEntries();
+        setEntries(data);
+
+        // All-time totals
+        const earnings = data
+          .filter((e) => e.entryType === "sale" || e.entryType === "income")
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        const expenses = data
+          .filter((e) => e.entryType === "expense" || e.entryType === "purchase")
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        setAllTimeEarnings(earnings);
+        setAllTimeExpenses(expenses);
+        setAllTimeProfit(earnings - expenses);
+
+        // Last-7-days daily breakdown
+        const dayAbbr = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const map = new Map<string, { day: string; earnings: number; expenses: number }>();
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const dateStr = d.toISOString().slice(0, 10);
+          map.set(dateStr, { day: dayAbbr[d.getDay()], earnings: 0, expenses: 0 });
+        }
+        for (const entry of data) {
+          const row = map.get(entry.entryDate);
+          if (!row) continue;
+          const amount = Number(entry.amount);
+          if (entry.entryType === "sale" || entry.entryType === "income") {
+            row.earnings += amount;
+          } else {
+            row.expenses += amount;
+          }
+        }
+        setWeeklyInsights([...map.values()]);
+      } catch (err) {
+        setFetchError(err instanceof Error ? err.message : "Failed to load report data");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const weeklyTotal = weeklyInsights.reduce((a, d) => a + d.earnings, 0);
   const weeklyExpenses = weeklyInsights.reduce((a, d) => a + d.expenses, 0);
   const weeklyProfit = weeklyTotal - weeklyExpenses;
-  const monthlyRevenue = weeklyTotal * 4;
-  const monthlyExpenses = weeklyExpenses * 4;
-  const monthlyProfit = monthlyRevenue - monthlyExpenses;
-  const growthRate = weeklyTotal > 0 ? ((weeklyProfit / weeklyTotal) * 100) : 0;
+  const growthRate = allTimeEarnings > 0 ? ((allTimeProfit / allTimeEarnings) * 100) : 0;
   const projectionGoal = Math.max(35, Math.min(92, Math.round(65 + growthRate / 4)));
 
   const recentExports = [
@@ -212,8 +262,8 @@ export default function ReportsPage() {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       const vendorLines = [
-        `Name: ${currentUser.name}`,
-        `Business: ${currentUser.businessType}`,
+        `Name: ${user?.name ?? "Unknown"}`,
+        `Business: ${user?.businessType ?? "Business"}`,
         `Date Range: ${isMonthly ? "March 2026" : "March 22 - March 28, 2026"}`,
       ];
       addPageIfNeeded(vendorLines.length * lineHeight + sectionGap);
@@ -294,15 +344,15 @@ export default function ReportsPage() {
         return colY;
       };
 
-      yLeft = drawColumnList(leftX, "Top Items", buildTopItems(), yLeft);
-      yRight = drawColumnList(rightX, "Expense Breakdown", buildExpenseBreakdown(), yRight);
+      yLeft = drawColumnList(leftX, "Top Items", buildTopItems(entries), yLeft);
+      yRight = drawColumnList(rightX, "Expense Breakdown", buildExpenseBreakdown(entries), yRight);
       y = Math.max(yLeft, yRight) + sectionGap;
 
       // Insights
       drawSectionTitle("Key Insights");
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
-      const insights = buildInsights(totalEarnings, totalExpenses, profit);
+      const insights = buildInsights(totalEarnings, totalExpenses, profit, weeklyInsights);
       insights.forEach((insight) => {
         const wrapped = doc.splitTextToSize(`- ${insight}`, contentWidth);
         const blockHeight = wrapped.length * lineHeight;
@@ -390,6 +440,12 @@ export default function ReportsPage() {
       <div className="space-y-6">
         <h1 className="text-2xl md:text-3xl font-bold">Financial Reports</h1>
 
+        {fetchError && (
+          <BrutalCard className="text-center py-6 border-destructive">
+            <p className="text-destructive font-bold">Failed to load report data: {fetchError}</p>
+          </BrutalCard>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <BrutalCard className="p-6">
             <div className="flex items-start gap-3">
@@ -441,15 +497,15 @@ export default function ReportsPage() {
             <div className="mt-6 space-y-4 font-mono">
               <div className="flex items-center justify-between border-b-[2px] border-border pb-2">
                 <span className="text-sm font-bold uppercase text-muted-foreground">Total Revenue</span>
-                <span className="text-3xl font-bold text-primary">{formatCurrency(monthlyRevenue)}</span>
+                <span className="text-3xl font-bold text-primary">{formatCurrency(allTimeEarnings)}</span>
               </div>
               <div className="flex items-center justify-between border-b-[2px] border-border pb-2">
                 <span className="text-sm font-bold uppercase text-muted-foreground">Operational Costs</span>
-                <span className="text-3xl font-bold text-destructive">({formatCurrency(monthlyExpenses)})</span>
+                <span className="text-3xl font-bold text-destructive">({formatCurrency(allTimeExpenses)})</span>
               </div>
               <div className="brutal-border p-4 bg-success/10">
                 <p className="text-sm font-bold uppercase text-muted-foreground">Net Auditory Profit</p>
-                <p className="text-4xl font-bold text-success mt-1">{formatCurrency(monthlyProfit)}</p>
+                <p className="text-4xl font-bold text-success mt-1">{formatCurrency(allTimeProfit)}</p>
               </div>
             </div>
           </BrutalCard>
@@ -472,7 +528,7 @@ export default function ReportsPage() {
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="brutal-border p-4 bg-primary/15">
                 <p className="text-xs font-bold uppercase text-muted-foreground">Total Entries</p>
-                <p className="text-3xl font-bold mt-1">{(ledgerEntries.length * 1783).toLocaleString()}</p>
+                <p className="text-3xl font-bold mt-1">{entries.length.toLocaleString()}</p>
               </div>
               <div className="brutal-border p-4 bg-secondary/15">
                 <p className="text-xs font-bold uppercase text-muted-foreground">Growth Rate</p>
@@ -500,7 +556,7 @@ export default function ReportsPage() {
                       <div>
                         <p className="font-bold text-lg break-all">{item.name}</p>
                         <p className="text-sm text-muted-foreground font-medium">
-                          Generated: {item.date} • {item.size} • {currentUser.businessType}
+                          Generated: {item.date} • {item.size} • {user?.businessType ?? "Business"}
                         </p>
                       </div>
                     </div>

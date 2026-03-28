@@ -7,6 +7,7 @@ import cors from "cors";
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
+import authRouter        from "./routes/auth.routes";
 import usersRouter       from "./routes/users.routes";
 import voiceRouter       from "./routes/voice.routes";
 import ledgerUploadRouter from "./routes/ledger-upload.routes";
@@ -86,6 +87,7 @@ app.use(
 
 /* --------------------------------------------------- */
 
+app.use("/auth",         authRouter);
 app.use("/users",        usersRouter);
 app.use("/voice",        voiceRouter);
 app.use("/ledger-upload", ledgerUploadRouter);

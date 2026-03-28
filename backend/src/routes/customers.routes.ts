@@ -14,6 +14,28 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
+// All ledger entries across all customers for this user — must be before /user/:userId
+router.get("/user/:userId/ledger", async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params as Record<string, string>;
+    const entries = await ctrl.listAllCustomerLedger(userId);
+    res.json(entries);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Customers with balance + last txn date — must be before /user/:userId
+router.get("/user/:userId/summary", async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params as Record<string, string>;
+    const summary = await ctrl.listCustomerSummary(userId);
+    res.json(summary);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // All customer balances for a vendor — must be before /user/:userId
 router.get("/user/:userId/balances", async (req: Request, res: Response) => {
   try {

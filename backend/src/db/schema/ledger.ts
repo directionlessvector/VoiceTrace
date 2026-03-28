@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, numeric, timestamp, pgEnum, date } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, numeric, timestamp, pgEnum, date, index } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { voiceSessions } from "./voice";
 
@@ -44,4 +44,7 @@ export const ledgerEntries = pgTable("ledger_entries", {
 
   createdAt:       timestamp("created_at").defaultNow().notNull(),
   updatedAt:       timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  userIdIdx:   index("ledger_user_id_idx").on(table.userId),
+  userDateIdx: index("ledger_user_date_idx").on(table.userId, table.entryDate),
+}));

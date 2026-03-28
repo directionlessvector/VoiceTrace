@@ -7,23 +7,42 @@ import { BrutalBadge } from "@/components/shared/BrutalBadge";
 import { BrutalModal } from "@/components/shared/BrutalModal";
 import { VoiceRecorderModal } from "@/components/shared/VoiceRecorderModal";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
-import { dashboardStats, recentActivity, currentUser } from "@/data/mockData";
 import { startVoiceAssistantCall, type VoiceProcessResponse } from "@/lib/voiceApi";
-import { createVoiceLedgerEntry } from "@/lib/ledgerApi";
+import { createVoiceLedgerEntry, listCurrentUserLedgerEntries, type LedgerEntry } from "@/lib/ledgerApi";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { DollarSign, TrendingDown, TrendingUp, Mic, Lightbulb, PhoneCall } from "lucide-react";
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ earnings: 0, expenses: 0, profit: 0 });
+  const [recentEntries, setRecentEntries] = useState<LedgerEntry[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
   const [isCalling, setIsCalling] = useState(false);
-  const [callNumber, setCallNumber] = useState(currentUser.phone.replace(/\s+/g, ""));
+  const [callNumber, setCallNumber] = useState(user?.phone ?? "");
   const { toast } = useToast();
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 1200);
-    return () => clearTimeout(t);
+    (async () => {
+      try {
+        const entries = await listCurrentUserLedgerEntries();
+        const earnings = entries
+          .filter((e) => e.entryType === "sale" || e.entryType === "income")
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        const expenses = entries
+          .filter((e) => e.entryType === "expense" || e.entryType === "purchase")
+          .reduce((sum, e) => sum + Number(e.amount), 0);
+        setStats({ earnings, expenses, profit: earnings - expenses });
+        const recent = [...entries]
+          .sort((a, b) => b.entryDate.localeCompare(a.entryDate))
+          .slice(0, 5);
+        setRecentEntries(recent);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   const handleSave = async (result: VoiceProcessResponse) => {
@@ -129,7 +148,7 @@ export default function DashboardPage() {
         {/* Greeting */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Good morning, {currentUser.name.split(" ")[0]}! 👋</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">Good morning, {user?.name?.split(" ")[0] ?? "there"}! 👋</h1>
             <p className="text-muted-foreground font-medium">Here's your business overview for today.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -144,9 +163,9 @@ export default function DashboardPage() {
 
         {/* Stats */}
         <div className="grid sm:grid-cols-3 gap-4">
-          <StatCard title="Earnings" value={dashboardStats.earnings} icon={DollarSign} variant="earnings" trend="up" trendValue="12% vs last week" />
-          <StatCard title="Expenses" value={dashboardStats.expenses} icon={TrendingDown} variant="expenses" trend="down" trendValue="5% vs last week" />
-          <StatCard title="Profit" value={dashboardStats.profit} icon={TrendingUp} variant="profit" trend="up" trendValue="18% vs last week" />
+          <StatCard title="Earnings" value={stats.earnings} icon={DollarSign} variant="earnings" trend="up" trendValue="12% vs last week" />
+          <StatCard title="Expenses" value={stats.expenses} icon={TrendingDown} variant="expenses" trend="down" trendValue="5% vs last week" />
+          <StatCard title="Profit" value={stats.profit} icon={TrendingUp} variant="profit" trend="up" trendValue="18% vs last week" />
         </div>
 
         {/* Insight */}
@@ -163,20 +182,30 @@ export default function DashboardPage() {
         {/* Recent Activity */}
         <div>
           <h2 className="text-xl font-bold mb-3">Recent Activity</h2>
-          <div className="space-y-3">
-            {recentActivity.map((a) => (
-              <BrutalCard key={a.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <p className="font-bold">{a.description}</p>
-                  <p className="text-sm text-muted-foreground font-medium">{a.date}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {a.earnings > 0 && <BrutalBadge variant="confirmed">+₹{a.earnings}</BrutalBadge>}
-                  {a.expenses > 0 && <BrutalBadge variant="danger">-₹{a.expenses}</BrutalBadge>}
-                </div>
-              </BrutalCard>
-            ))}
-          </div>
+          {recentEntries.length === 0 ? (
+            <BrutalCard className="text-center py-8">
+              <p className="text-muted-foreground font-medium">No entries yet. Record your first voice entry!</p>
+            </BrutalCard>
+          ) : (
+            <div className="space-y-3">
+              {recentEntries.map((entry) => {
+                const isSale = entry.entryType === "sale" || entry.entryType === "income";
+                const amount = Number(entry.amount);
+                return (
+                  <BrutalCard key={entry.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <p className="font-bold">{entry.itemName ?? (isSale ? "Voice sale" : "Voice expense")}</p>
+                      <p className="text-sm text-muted-foreground font-medium">{entry.entryDate}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {isSale && <BrutalBadge variant="confirmed">+₹{amount}</BrutalBadge>}
+                      {!isSale && <BrutalBadge variant="danger">-₹{amount}</BrutalBadge>}
+                    </div>
+                  </BrutalCard>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

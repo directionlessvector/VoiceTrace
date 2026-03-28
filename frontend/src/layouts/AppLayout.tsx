@@ -1,5 +1,6 @@
 import { ReactNode, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, BookOpen, TrendingUp, Package, FileText,
   AlertTriangle, User, Shield, Menu, X, Mic, LogOut, Wallet, MapPin
@@ -29,6 +30,15 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const userInitial = user?.name?.charAt(0)?.toUpperCase() ?? "?";
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -102,13 +112,13 @@ export function AppLayout({ children }: AppLayoutProps) {
         </nav>
 
         <div className="p-3 border-t-[3px] border-foreground">
-          <Link
-            to="/"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-bold hover:bg-destructive/10 text-destructive"
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-bold hover:bg-destructive/10 text-destructive"
           >
             <LogOut size={18} />
             Logout
-          </Link>
+          </button>
         </div>
       </aside>
 
@@ -125,7 +135,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="hidden lg:block" />
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-primary rounded-sm brutal-border flex items-center justify-center text-primary-foreground text-sm font-bold">
-              R
+              {userInitial}
             </div>
           </div>
         </header>
