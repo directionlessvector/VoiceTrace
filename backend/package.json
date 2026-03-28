@@ -10,7 +10,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "build": "tsc",
-    "start": "node dist/app.js"
+    "start": "node dist/src/app.js"
   },
   "keywords": [],
   "author": "",
