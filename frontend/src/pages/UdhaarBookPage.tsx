@@ -41,19 +41,19 @@ export default function UdhaarBookPage() {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
               <Wallet className="text-primary" /> UdhaarBook
             </h1>
-            <p className="text-sm sm:text-base text-muted-foreground font-medium mt-1">Track and recover customer udhaar efficiently.</p>
+            <p className="text-muted-foreground font-medium mt-1">Track and recover customer udhaar efficiently.</p>
           </div>
-          <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
-            <BrutalButton variant="secondary" className="flex-1 sm:flex-none justify-center whitespace-nowrap px-3" onClick={() => {}}>
-              <Mic size={16} className="sm:w-[18px] sm:h-[18px]" /> <span className="text-sm">Record</span><span className="hidden sm:inline">&nbsp;Udhaar</span>
+          <div className="flex gap-3">
+            <BrutalButton variant="secondary" onClick={() => { }}>
+              <Mic size={18} /> Record Udhaar
             </BrutalButton>
-            <BrutalButton variant="primary" className="flex-1 sm:flex-none justify-center whitespace-nowrap px-3" onClick={() => setAddModalOpen(true)}>
-              <Plus size={16} className="sm:w-[18px] sm:h-[18px]" /> <span className="text-sm">Add</span><span className="hidden sm:inline">&nbsp;Udhaar</span>
+            <BrutalButton variant="primary" onClick={() => setAddModalOpen(true)}>
+              <Plus size={18} /> Add Udhaar
             </BrutalButton>
           </div>
         </div>
@@ -67,13 +67,13 @@ export default function UdhaarBookPage() {
         </div>
 
         {/* Filter and Search */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 py-2">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-2">
           {/* Segments */}
-          <div className="flex items-center brutal-border bg-card overflow-hidden w-full sm:w-fit">
+          <div className="flex items-center brutal-border bg-card overflow-hidden w-fit">
             {["all", "pending", "overdue", "paid"].map((f) => (
               <button
                 key={f}
-                className={`flex-1 sm:flex-none px-2 sm:px-4 py-2 text-xs sm:text-sm font-bold border-r-[3px] border-foreground last:border-0 transition-colors capitalize ${filter === f ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                className={`px-4 py-2 text-sm font-bold border-r-[3px] border-foreground last:border-0 transition-colors capitalize ${filter === f ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 onClick={() => setFilter(f)}
               >
                 {f}
@@ -82,11 +82,10 @@ export default function UdhaarBookPage() {
           </div>
           {/* Search Input */}
           <div className="w-full md:w-72">
-            <BrutalInput 
-              placeholder="Search name or phone..." 
-              value={search} 
-              onChange={(e) => setSearch(e.target.value)} 
-              icon={<Search size={18} />}
+            <BrutalInput
+              placeholder="Search name or phone..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
         </div>
@@ -119,7 +118,7 @@ export default function UdhaarBookPage() {
                     <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Outstanding</p>
                     <p className="text-2xl font-black font-mono">₹{customer.amount.toLocaleString()}</p>
                   </div>
-                  
+
                   <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                     <BrutalButton variant="secondary" className="flex-1 sm:flex-none px-3" onClick={() => setDetailsModalOpen(customer.id)}>
                       <FileText size={16} /> Details
@@ -150,7 +149,7 @@ export default function UdhaarBookPage() {
               </div>
               <BrutalButton variant="secondary" className="px-2 py-1" onClick={() => setDetailsModalOpen(null)}>X</BrutalButton>
             </div>
-            
+
             <div className="p-5 overflow-y-auto flex-1 space-y-6">
               <div className="flex justify-between items-center p-4 bg-muted brutal-border">
                 <p className="font-bold">Total Due</p>
@@ -190,7 +189,7 @@ export default function UdhaarBookPage() {
             <div className="p-5 border-t-[3px] border-foreground flex gap-3">
               <BrutalButton variant="secondary" className="flex-1"><Phone size={18} /> Call</BrutalButton>
               <BrutalButton variant="primary" className="flex-1"><Bell size={18} /> Reminder</BrutalButton>
-              <BrutalButton variant="success" className="flex-1 whitespace-nowrap"><CheckCircle2 size={18} /> Mark Paid</BrutalButton>
+              <BrutalButton variant="primary" className="flex-1 whitespace-nowrap"><CheckCircle2 size={18} /> Mark Paid</BrutalButton>
             </div>
           </div>
         </div>
@@ -205,12 +204,12 @@ export default function UdhaarBookPage() {
               <h2 className="text-xl font-black">Add New Udhaar</h2>
               <button className="font-black hover:opacity-80" onClick={() => setAddModalOpen(false)}>✕</button>
             </div>
-            
+
             <div className="p-5 space-y-4">
               <BrutalInput label="Customer Name" placeholder="e.g. Ramesh Singh" />
               <BrutalInput label="Phone Number" placeholder="+91 99999 99999" />
               <BrutalInput label="Item / Description" placeholder="e.g. 10 bags of rice" />
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <BrutalInput label="Amount (₹)" placeholder="0.00" />
                 <BrutalInput label="Due Date" type="date" placeholder="" />

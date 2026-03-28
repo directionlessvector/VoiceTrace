@@ -18,6 +18,16 @@ Create `backend/.env`:
 GROQ_API_KEY=your_groq_api_key
 # Optional override for extraction model
 GROQ_LEDGER_MODEL=llama-3.3-70b-versatile
+# Cloudinary (required for voice file storage)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+# Optional folder for uploaded voice assets
+CLOUDINARY_VOICE_FOLDER=voicetrace/audio
+# Optional folder for OCR ledger images
+CLOUDINARY_LEDGER_FOLDER=voicetrace/ledger-images
+# Optional fallback user id if frontend does not send userId
+VOICE_DEFAULT_USER_ID=existing_user_uuid
 # Optional: comma-separated CORS allowed origins
 CORS_ORIGIN=http://localhost:8080,http://localhost:5173
 PORT=3000
@@ -53,6 +63,8 @@ npm run dev
 
 - Content type: `multipart/form-data`
 - File field: `audio`
+- Optional text fields: `userId`, `recordedAt`
+- Optional header: `x-user-id`
 - Max file size: 25 MB
 
 Example response shape:
@@ -91,3 +103,16 @@ Example response shape:
 	}
 }
 ```
+
+### `POST /ledger-upload/process`
+
+- Content type: `multipart/form-data`
+- File field: `image` (`jpg`/`png`)
+- Optional fields: `userId`, `confirmSave` (`true` or `false`)
+
+Behavior:
+
+1. Upload image to Cloudinary
+2. Run OCR on image text
+3. Send extracted text to Groq for structured extraction
+4. If `confirmSave=true`, persist to `voice_sessions` (`session_type=ledger_upload`) and `ledger_entries`

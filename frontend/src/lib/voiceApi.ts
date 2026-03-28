@@ -13,6 +13,20 @@ export type StructuredLine = {
 
 export type VoiceProcessResponse = {
   ok: boolean;
+  cloudinary_url?: string;
+  voiceSessionId?: string;
+  transcription?: string;
+  extractedData?: {
+    items: StructuredLine[];
+    expenses: StructuredLine[];
+    earnings: StructuredLine[];
+    totals: {
+      expenseTotal: number;
+      earningsTotal: number;
+      net: number;
+    };
+    notes: string[];
+  };
   transcript: string;
   languageDetected: string;
   structured: {
@@ -28,11 +42,16 @@ export type VoiceProcessResponse = {
   };
 };
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+import { getApiBaseUrl, resolveActiveUserId } from "@/lib/backendApi";
+
+const API_BASE_URL = getApiBaseUrl();
 
 export async function processVoiceAudio(blob: Blob, filename = "voice.webm"): Promise<VoiceProcessResponse> {
+  const userId = await resolveActiveUserId();
   const form = new FormData();
   form.append("audio", blob, filename);
+  form.append("userId", userId);
+  form.append("recordedAt", new Date().toISOString());
 
   const response = await fetch(`${API_BASE_URL}/voice/process`, {
     method: "POST",

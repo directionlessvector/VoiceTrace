@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, BookOpen, TrendingUp, Package, FileText,
-  AlertTriangle, User, Shield, Menu, X, Mic, LogOut, Wallet
+  AlertTriangle, User, Shield, Menu, X, Mic, LogOut, Wallet, MapPin
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ const navItems = [
   { title: "UdhaarBook", path: "/udhaar", icon: Wallet },
   { title: "Insights", path: "/insights", icon: TrendingUp },
   { title: "Suggestions", path: "/suggestions", icon: Package },
+  { title: "Nearby Suppliers", path: "/nearby-suppliers", icon: MapPin },
   { title: "Reports", path: "/reports", icon: FileText },
   { title: "Alerts", path: "/alerts", icon: AlertTriangle },
   { title: "Profile", path: "/profile", icon: User },

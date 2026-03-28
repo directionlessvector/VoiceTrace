@@ -1,16 +1,20 @@
-import "dotenv/config";
+import path from "path";
+import dotenv from "dotenv";
 import express, { Request, Response } from "express";
 import pinoHttp from "pino-http";
 import pino from "pino";
-import express from "express";
 import cors from "cors";
+
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 import usersRouter       from "./routes/users.routes";
 import voiceRouter       from "./routes/voice.routes";
+import ledgerUploadRouter from "./routes/ledger-upload.routes";
 import ledgerRouter      from "./routes/ledger.routes";
 import customersRouter   from "./routes/customers.routes";
 import stockRouter       from "./routes/stock.routes";
 import suppliersRouter   from "./routes/suppliers.routes";
+import osmSuppliersRouter from "./routes/osm-suppliers.routes";
 import anomaliesRouter   from "./routes/anomalies.routes";
 import intelligenceRouter from "./routes/intelligence.routes";
 import alertsRouter      from "./routes/alerts.routes";
@@ -84,10 +88,12 @@ app.use(
 
 app.use("/users",        usersRouter);
 app.use("/voice",        voiceRouter);
+app.use("/ledger-upload", ledgerUploadRouter);
 app.use("/ledger",       ledgerRouter);
 app.use("/customers",    customersRouter);
 app.use("/stock",        stockRouter);
 app.use("/suppliers",    suppliersRouter);
+app.use("/api/osm-suppliers", osmSuppliersRouter);
 app.use("/anomalies",    anomaliesRouter);
 app.use("/intelligence", intelligenceRouter);
 app.use("/alerts",       alertsRouter);

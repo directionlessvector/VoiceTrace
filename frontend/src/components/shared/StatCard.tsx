@@ -28,19 +28,19 @@ export function StatCard({ title, value, icon: Icon, trend, trendValue, variant 
   };
 
   return (
-    <div className={cn("brutal-card p-3 sm:p-5", variantStyles[variant])}>
-      <div className="flex items-start justify-between gap-1 sm:gap-4">
-        <div className="min-w-0">
-          <p className="text-xs sm:text-sm font-bold uppercase tracking-wide text-muted-foreground truncate">{title}</p>
-          <p className="text-xl sm:text-3xl font-bold mt-1 font-mono truncate">{typeof value === "number" ? `₹${value.toLocaleString()}` : value}</p>
+    <div className={cn("brutal-card p-5", variantStyles[variant])}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-wide text-muted-foreground">{title}</p>
+          <p className="text-3xl font-bold mt-1 font-mono">{typeof value === "number" ? `₹${value.toLocaleString()}` : value}</p>
           {trend && trendValue && (
-            <p className={cn("text-[10px] sm:text-sm font-bold mt-1 truncate", trend === "up" ? "text-success" : trend === "down" ? "text-destructive" : "text-muted-foreground")}>
+            <p className={cn("text-sm font-bold mt-1", trend === "up" ? "text-success" : trend === "down" ? "text-destructive" : "text-muted-foreground")}>
               {trend === "up" ? "↑" : trend === "down" ? "↓" : "→"} {trendValue}
             </p>
           )}
         </div>
-        <div className={cn("p-1.5 sm:p-2 brutal-border brutal-shadow-sm shrink-0", iconStyles[variant])}>
-          <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
+        <div className={cn("p-2 brutal-border brutal-shadow-sm", iconStyles[variant])}>
+          <Icon size={24} />
         </div>
       </div>
     </div>

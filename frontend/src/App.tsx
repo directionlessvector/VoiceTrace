@@ -11,6 +11,7 @@ import LedgerPage from "./pages/LedgerPage";
 import UdhaarBookPage from "./pages/UdhaarBookPage";
 import InsightsPage from "./pages/InsightsPage";
 import SuggestionsPage from "./pages/SuggestionsPage";
+import NearbySuppliersPage from "./pages/NearbySuppliersPage";
 import ReportsPage from "./pages/ReportsPage";
 import AlertsPage from "./pages/AlertsPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/udhaar" element={<UdhaarBookPage />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/suggestions" element={<SuggestionsPage />} />
+          <Route path="/nearby-suppliers" element={<NearbySuppliersPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
