@@ -77,11 +77,12 @@ export async function processVoiceAudio(blob: Blob, filename = "voice.webm"): Pr
 }
 
 export async function startVoiceAssistantCall(to: string): Promise<StartVoiceCallResponse> {
+  const userId = await resolveActiveUserId();
   return fetchJson<StartVoiceCallResponse>("/voice/call/start", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ to }),
+    body: JSON.stringify({ to, userId }),
   });
 }
