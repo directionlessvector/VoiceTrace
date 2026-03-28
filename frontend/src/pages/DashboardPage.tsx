@@ -4,17 +4,21 @@ import { StatCard } from "@/components/shared/StatCard";
 import { BrutalCard } from "@/components/shared/BrutalCard";
 import { BrutalButton } from "@/components/shared/BrutalButton";
 import { BrutalBadge } from "@/components/shared/BrutalBadge";
+import { BrutalModal } from "@/components/shared/BrutalModal";
 import { VoiceRecorderModal } from "@/components/shared/VoiceRecorderModal";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
 import { dashboardStats, recentActivity, currentUser } from "@/data/mockData";
-import type { VoiceProcessResponse } from "@/lib/voiceApi";
+import { startVoiceAssistantCall, type VoiceProcessResponse } from "@/lib/voiceApi";
 import { createVoiceLedgerEntry } from "@/lib/ledgerApi";
 import { useToast } from "@/hooks/use-toast";
-import { DollarSign, TrendingDown, TrendingUp, Mic, Lightbulb } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Mic, Lightbulb, PhoneCall } from "lucide-react";
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
+  const [isCalling, setIsCalling] = useState(false);
+  const [callNumber, setCallNumber] = useState(currentUser.phone.replace(/\s+/g, ""));
   const { toast } = useToast();
 
   useEffect(() => {
@@ -74,6 +78,35 @@ export default function DashboardPage() {
     }
   };
 
+  const handleStartCall = async () => {
+    if (!callNumber.trim()) {
+      toast({
+        title: "Number required",
+        description: "Enter a phone number in format like +919876543210",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCalling(true);
+    try {
+      const response = await startVoiceAssistantCall(callNumber.trim());
+      toast({
+        title: "Calling now",
+        description: `Call started (${response.callSid}). Pick up to talk to the assistant.`,
+      });
+      setCallOpen(false);
+    } catch (error) {
+      toast({
+        title: "Call failed",
+        description: error instanceof Error ? error.message : "Could not start outbound call",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCalling(false);
+    }
+  };
+
   if (loading) {
     return (
       <AppLayout>
@@ -99,9 +132,14 @@ export default function DashboardPage() {
             <h1 className="text-2xl md:text-3xl font-bold">Good morning, {currentUser.name.split(" ")[0]}! 👋</h1>
             <p className="text-muted-foreground font-medium">Here's your business overview for today.</p>
           </div>
-          <BrutalButton variant="primary" size="lg" onClick={() => setVoiceOpen(true)}>
-            <Mic size={22} /> Record Entry
-          </BrutalButton>
+          <div className="flex flex-wrap items-center gap-2">
+            <BrutalButton variant="outline" size="lg" onClick={() => setCallOpen(true)}>
+              <PhoneCall size={20} /> Call Assistant
+            </BrutalButton>
+            <BrutalButton variant="primary" size="lg" onClick={() => setVoiceOpen(true)}>
+              <Mic size={22} /> Record Entry
+            </BrutalButton>
+          </div>
         </div>
 
         {/* Stats */}
@@ -143,6 +181,25 @@ export default function DashboardPage() {
       </div>
 
       <VoiceRecorderModal open={voiceOpen} onClose={() => setVoiceOpen(false)} onSave={handleSave} />
+
+      <BrutalModal open={callOpen} onClose={() => setCallOpen(false)} title="Call Voice Assistant">
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground font-medium">
+            Enter the phone number to receive the call. Use E.164 format like +919876543210.
+          </p>
+          <input
+            value={callNumber}
+            onChange={(e) => setCallNumber(e.target.value)}
+            placeholder="+919876543210"
+            className="w-full px-4 py-2.5 brutal-input"
+          />
+          <div className="flex justify-end">
+            <BrutalButton variant="primary" onClick={handleStartCall} loading={isCalling}>
+              <PhoneCall size={16} /> Start Call
+            </BrutalButton>
+          </div>
+        </div>
+      </BrutalModal>
     </AppLayout>
   );
 }
