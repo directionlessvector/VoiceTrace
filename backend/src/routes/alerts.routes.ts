@@ -111,4 +111,23 @@ router.patch("/notifications/:id/status", async (req: Request, res: Response) =>
   }
 });
 
+import { sendWhatsAppMessageViaGreenApi } from "../services/greenapi";
+
+router.post("/notifications/whatsapp/send", async (req: Request, res: Response) => {
+  try {
+    const { phone, message } = req.body;
+    if (!phone || !message) {
+      return res.status(400).json({ error: "Phone and message are required in the request body." });
+    }
+    const success = await sendWhatsAppMessageViaGreenApi(phone, message);
+    if (success) {
+      res.json({ success: true, message: "WhatsApp message sent successfully via Green API" });
+    } else {
+      res.status(500).json({ error: "Failed to send WhatsApp message via Green API. Check server logs." });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
