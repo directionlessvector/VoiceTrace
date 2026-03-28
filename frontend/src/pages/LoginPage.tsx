@@ -6,9 +6,12 @@ import { FloatingCoin } from "@/components/shared/FloatingCoin";
 import { Mic } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
+const ADMIN_ID = import.meta.env.VITE_ADMIN_ID;
+
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { adminLogin } = useAuth();
+  const { login, adminLogin, user } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -17,7 +20,7 @@ export default function LoginPage() {
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!email) e.email = "Email is required";
+    if (!email.trim()) e.email = "Phone or Email is required";
     if (!password) e.password = "Password is required";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -29,9 +32,20 @@ export default function LoginPage() {
 
     setLoading(true);
     setApiError(null);
+
     try {
-      await adminLogin(email, password);
-      navigate("/admin");
+      // 1. Always perform normal user login first
+      await login(email.trim(), password);
+
+      // 2. Check if the logged-in user is the admin
+      if (user?.id === ADMIN_ID) {
+        // This is the admin → also trigger admin login
+        await adminLogin(email.trim(), password);
+        navigate("/admin");
+      } else {
+        // Normal user login successful
+        navigate("/dashboard"); // ← Change this if your user dashboard route is different
+      }
     } catch (err: any) {
       setApiError(err.message || "Login failed. Please try again.");
     } finally {
@@ -41,15 +55,49 @@ export default function LoginPage() {
 
   return (
     <div className="relative overflow-hidden min-h-screen bg-background flex items-center justify-center p-4">
-
       {/* Massive Responsive Ambient Coins */}
-      <FloatingCoin className="text-[120px] md:text-[320px] -top-[5%] md:-top-[15%] -left-[10%] md:-left-[5%]" delay={0.2} rotation={-30} shadowX={0.08} shadowY={0.15} />
-      <FloatingCoin className="text-[90px] md:text-[230px] top-[40%] md:top-[45%] -left-[5%] md:left-[2%]" delay={1.4} rotation={15} shadowX={-0.12} shadowY={0.12} />
-      <FloatingCoin className="text-[100px] md:text-[180px] -bottom-[5%] md:-bottom-[10%] left-[8%] md:left-[15%]" delay={0.7} rotation={-10} shadowX={-0.1} shadowY={0.15} />
-
-      <FloatingCoin className="text-[90px] md:text-[160px] top-[8%] md:top-[12%] right-[5%] md:right-[15%]" delay={1.1} rotation={20} shadowX={0.06} shadowY={0.12} />
-      <FloatingCoin className="text-[140px] md:text-[280px] top-[50%] md:top-[40%] -right-[15%] md:-right-[8%]" delay={2.5} rotation={-25} shadowX={-0.15} shadowY={0.1} />
-      <FloatingCoin className="text-[110px] md:text-[240px] -bottom-[5%] md:-bottom-[12%] -right-[5%] md:right-[2%]" delay={0.4} rotation={5} shadowX={-0.08} shadowY={0.14} />
+      <FloatingCoin 
+        className="text-[120px] md:text-[320px] -top-[5%] md:-top-[15%] -left-[10%] md:-left-[5%]" 
+        delay={0.2} 
+        rotation={-30} 
+        shadowX={0.08} 
+        shadowY={0.15} 
+      />
+      <FloatingCoin 
+        className="text-[90px] md:text-[230px] top-[40%] md:top-[45%] -left-[5%] md:left-[2%]" 
+        delay={1.4} 
+        rotation={15} 
+        shadowX={-0.12} 
+        shadowY={0.12} 
+      />
+      <FloatingCoin 
+        className="text-[100px] md:text-[180px] -bottom-[5%] md:-bottom-[10%] left-[8%] md:left-[15%]" 
+        delay={0.7} 
+        rotation={-10} 
+        shadowX={-0.1} 
+        shadowY={0.15} 
+      />
+      <FloatingCoin 
+        className="text-[90px] md:text-[160px] top-[8%] md:top-[12%] right-[5%] md:right-[15%]" 
+        delay={1.1} 
+        rotation={20} 
+        shadowX={0.06} 
+        shadowY={0.12} 
+      />
+      <FloatingCoin 
+        className="text-[140px] md:text-[280px] top-[50%] md:top-[40%] -right-[15%] md:-right-[8%]" 
+        delay={2.5} 
+        rotation={-25} 
+        shadowX={-0.15} 
+        shadowY={0.1} 
+      />
+      <FloatingCoin 
+        className="text-[110px] md:text-[240px] -bottom-[5%] md:-bottom-[12%] -right-[5%] md:right-[2%]" 
+        delay={0.4} 
+        rotation={5} 
+        shadowX={-0.08} 
+        shadowY={0.14} 
+      />
 
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
@@ -71,7 +119,6 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               error={errors.email}
             />
-
             <BrutalInput
               label="Password"
               type="password"
@@ -80,18 +127,27 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               error={errors.password}
             />
-
-            <BrutalButton type="submit" variant="primary" className="w-full" loading={loading}>
+            <BrutalButton 
+              type="submit" 
+              variant="primary" 
+              className="w-full" 
+              loading={loading}
+            >
               Login
             </BrutalButton>
 
             {apiError && (
-              <p className="text-sm font-bold text-destructive text-center">{apiError}</p>
+              <p className="text-sm font-bold text-destructive text-center">
+                {apiError}
+              </p>
             )}
           </form>
 
           <p className="text-center mt-4 text-sm font-medium text-muted-foreground">
-            <Link to="/signup" className="text-primary font-bold underline">Sign Up</Link>
+            Don't have an account?{" "}
+            <Link to="/signup" className="text-primary font-bold underline">
+              Sign Up
+            </Link>
           </p>
         </div>
       </div>

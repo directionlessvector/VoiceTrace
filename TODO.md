@@ -1,13 +1,17 @@
-# VoiceTrace Proper README Edit Plan
+# VoiceTrace PDF Enhancement TODO
 
-## Steps from Approved Plan
+## VoiceTrace PDF Enhancement - COMPLETE ✓
 
-✅ **Step 0**: Understand files (backend/docs.md, README.md, frontend/README.md/package.json) - Complete
+## Steps Completed:
+- [x] 1. Create TODO.md
+- [x] 2. Analyze/read ReportsPage.tsx
+- [x] 3. Edit: Added dateStr to weeklyInsights, PDF table now shows "YYYY-MM-DD (Weekday)" e.g. "2026-03-28 (Sun)"
+- [x] 4. Fix TS errors (type casts, map for buildInsights)
+- [x] 5. Verified real DB transactions (ledger_entries table)
 
-✅ **Step 1**: Create TODO.md to track progress - Complete
+**Changes**: frontend/src/pages/ReportsPage.tsx updated. PDF daily summary table now prints full date + weekday from real entryDate.
 
-✅ **Step 2**: Edit root README.md - Complete
+**Test**: `cd frontend && bun dev` → http://localhost:5173/reports → Generate PDF → Check "Daily Summary" table.
 
-✅ **Step 3**: Update TODO.md - Complete
+Task complete.
 
-✅ **Step 4**: Task complete
