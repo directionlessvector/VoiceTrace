@@ -3,13 +3,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, BookOpen, TrendingUp, Package, FileText,
-  AlertTriangle, User, Shield, Menu, X, Mic, LogOut, Wallet, MapPin
+  AlertTriangle, User, Shield, Menu, X, Mic, LogOut, Wallet, MapPin, Upload
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { title: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { title: "Ledger", path: "/ledger", icon: BookOpen },
+  { title: "Upload Ledger", path: "/upload-ledger", icon: Upload },
   { title: "UdhaarBook", path: "/udhaar", icon: Wallet },
   { title: "Insights", path: "/insights", icon: TrendingUp },
   { title: "Suggestions", path: "/suggestions", icon: Package },
@@ -19,9 +20,7 @@ const navItems = [
   { title: "Profile", path: "/profile", icon: User },
 ];
 
-const adminItems = [
-  { title: "Admin", path: "/admin", icon: Shield },
-];
+const adminItems = [{ title: "Admin Dashboard", path: "/admin", icon: Shield }];
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -31,14 +30,15 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, adminUser, logout } = useAuth();
+  const isAdminSession = !!adminUser;
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
-  const userInitial = user?.name?.charAt(0)?.toUpperCase() ?? "?";
+  const userInitial = (isAdminSession ? adminUser?.email?.charAt(0) : user?.name?.charAt(0))?.toUpperCase() ?? "?";
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -56,7 +56,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         )}
       >
         <div className="p-5 border-b-[3px] border-foreground flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-2">
+          <Link to={isAdminSession ? "/admin" : "/dashboard"} className="flex items-center gap-2">
             <div className="w-9 h-9 bg-primary rounded-sm brutal-border flex items-center justify-center">
               <Mic size={20} className="text-primary-foreground" />
             </div>
@@ -68,7 +68,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {(isAdminSession ? adminItems : navItems).map((item) => {
             const active = location.pathname === item.path;
             return (
               <Link
@@ -78,29 +78,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-bold transition-all",
                   active
-                    ? "bg-primary text-primary-foreground brutal-border brutal-shadow-sm"
-                    : "hover:bg-muted"
-                )}
-              >
-                <item.icon size={18} />
-                {item.title}
-              </Link>
-            );
-          })}
-
-          <div className="border-t-[3px] border-foreground my-3" />
-
-          {adminItems.map((item) => {
-            const active = location.pathname.startsWith(item.path);
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => setSidebarOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-bold transition-all",
-                  active
-                    ? "bg-secondary text-secondary-foreground brutal-border brutal-shadow-sm"
+                    ? `${isAdminSession ? "bg-secondary text-secondary-foreground" : "bg-primary text-primary-foreground"} brutal-border brutal-shadow-sm`
                     : "hover:bg-muted"
                 )}
               >

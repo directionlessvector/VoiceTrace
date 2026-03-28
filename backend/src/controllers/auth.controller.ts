@@ -1,12 +1,29 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { db } from "../db/client";
 import { users } from "../db/schema";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES_IN = "7d";
 const BCRYPT_ROUNDS = 10;
+
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D+/g, "");
+  if (digits.length === 10) return `+91${digits}`;
+  if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;
+  if (digits.length > 0 && phone.trim().startsWith("+")) return `+${digits}`;
+  return phone.trim();
+}
+
+function phoneCandidates(phone: string): string[] {
+  const trimmed = phone.trim();
+  const normalized = normalizePhone(phone);
+  const digits = phone.replace(/\D+/g, "");
+  const local10 = digits.length >= 10 ? digits.slice(-10) : "";
+
+  return [...new Set([trimmed, normalized, local10].filter(Boolean))];
+}
 
 function signToken(userId: string, phone: string): string {
   return jwt.sign({ userId, phone }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -31,10 +48,13 @@ export async function register(data: {
   if (!data.password) throw new Error("Password is required");
   if (!data.name) throw new Error("Name is required");
 
+  const normalizedPhone = normalizePhone(data.phone);
+  const candidates = phoneCandidates(data.phone);
+
   const existing = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.phone, data.phone));
+    .where(or(...candidates.map((candidate) => eq(users.phone, candidate))));
 
   if (existing.length > 0) {
     throw new Error("Phone number already registered");
@@ -45,7 +65,7 @@ export async function register(data: {
   const [user] = await db
     .insert(users)
     .values({
-      phone: data.phone,
+      phone: normalizedPhone,
       passwordHash,
       name: data.name,
       businessType: (data.businessType as any) ?? "retail",
@@ -65,10 +85,12 @@ export async function login(data: { phone: string; password: string }) {
     throw new Error("Phone and password are required");
   }
 
+  const candidates = phoneCandidates(data.phone);
+
   const [user] = await db
     .select()
     .from(users)
-    .where(eq(users.phone, data.phone));
+    .where(or(...candidates.map((candidate) => eq(users.phone, candidate))));
 
   if (!user || !user.passwordHash) {
     throw new Error("Invalid phone number or password");

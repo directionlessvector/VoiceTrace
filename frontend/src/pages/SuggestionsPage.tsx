@@ -6,6 +6,7 @@ import { BrutalButton } from "@/components/shared/BrutalButton";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
 import { suggestions } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
+import { createAlertNotification, type NotificationChannel } from "@/lib/alertsApi";
 import { Package, ArrowUp, ArrowDown, Minus, AlertTriangle, TrendingUp, BarChart3 } from "lucide-react";
 
 type Trend = "increasing" | "stable" | "decreasing";
@@ -161,6 +162,7 @@ export default function SuggestionsPage() {
   const [weatherSuggestions, setWeatherSuggestions] = useState<WeatherSuggestion[]>([]);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [sendingChannel, setSendingChannel] = useState<NotificationChannel | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -210,6 +212,62 @@ export default function SuggestionsPage() {
       title: manualMode ? "Manual mode off" : "Manual mode on",
       description: manualMode ? "Back to AI suggestions view." : "You can now fine-tune quantities manually.",
     });
+  };
+
+  const buildSuggestionsMessage = (): string => {
+    const stockLines = enriched.slice(0, 5).map((item, index) => {
+      const delta = item.suggestedQty - item.currentQty;
+      const sign = delta > 0 ? `+${delta}` : `${delta}`;
+      return `${index + 1}. ${item.item}: ${item.currentQty} -> ${item.suggestedQty} (${sign}) | ${item.trend} | ${item.confidence}`;
+    });
+
+    const weatherLines = weatherSuggestions.slice(0, 3).map((item, index) => {
+      return `${index + 1}. ${item.item}: ${item.suggestedQuantity} (${item.weatherLabel})`;
+    });
+
+    const sections = [
+      "VoiceTrace Stock Suggestions",
+      `Generated: ${new Date().toLocaleString()}`,
+      "",
+      "Priority Stock Actions:",
+      ...(stockLines.length ? stockLines : ["No stock suggestions available"]),
+    ];
+
+    if (weatherLines.length) {
+      sections.push("", "Weather Signals:", ...weatherLines);
+    }
+
+    if (topPriority) {
+      sections.push("", `Top Priority: ${topPriority.item} (+${Math.max(0, topPriority.delta)} suggested)`);
+    }
+
+    return sections.join("\n");
+  };
+
+  const handleSendSuggestions = async (channel: NotificationChannel) => {
+    try {
+      setSendingChannel(channel);
+      const sent = await createAlertNotification({
+        channel,
+        messageBody: buildSuggestionsMessage(),
+      });
+
+      const destination = sent.destination || "configured destination";
+      const provider = sent.provider ? ` via ${sent.provider}` : "";
+
+      toast({
+        title: `Suggestions ${sent.status} for ${channel.toUpperCase()}`,
+        description: `Sent to ${destination}${provider}`,
+      });
+    } catch (error) {
+      toast({
+        title: `Failed to send via ${channel.toUpperCase()}`,
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingChannel(null);
+    }
   };
 
   useEffect(() => {
@@ -367,7 +425,7 @@ export default function SuggestionsPage() {
         </BrutalCard>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <BrutalCard className="p-4" highlight="info">
+          <BrutalCard className="p-4" highlight="secondary">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={16} className="text-primary" />
               <p className="text-sm font-bold uppercase">Demand Trend</p>
@@ -483,6 +541,20 @@ export default function SuggestionsPage() {
             <div className="flex flex-col sm:flex-row gap-2">
               <BrutalButton variant="primary" onClick={handleAcceptAll}>Accept All Suggestions</BrutalButton>
               <BrutalButton variant="outline" onClick={handleManualEdit}>{manualMode ? "Exit Manual Edit" : "Edit Manually"}</BrutalButton>
+              <BrutalButton
+                variant="outline"
+                onClick={() => handleSendSuggestions("whatsapp")}
+                disabled={sendingChannel !== null}
+              >
+                {sendingChannel === "whatsapp" ? "Sending WhatsApp..." : "Send on WhatsApp"}
+              </BrutalButton>
+              <BrutalButton
+                variant="outline"
+                onClick={() => handleSendSuggestions("sms")}
+                disabled={sendingChannel !== null}
+              >
+                {sendingChannel === "sms" ? "Sending SMS..." : "Send on SMS"}
+              </BrutalButton>
             </div>
           </div>
         </BrutalCard>

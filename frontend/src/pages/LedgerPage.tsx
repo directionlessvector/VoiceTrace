@@ -156,52 +156,31 @@ export default function LedgerPage() {
         if (!mounted) return;
 
         const grouped = groupEntriesByDay(rows);
+        const sessionCache = new Map<string, Awaited<ReturnType<typeof getVoiceSessionById>> | null>();
+        const withVoice = await Promise.all(
+          grouped.map(async (row) => {
+            const sessionId = row.voiceSessionId;
+            if (!sessionId) return row;
 
-        // === Fetch voice data ONLY for rows that have valid voiceSessionId ===
-        const voiceRows = grouped.filter((row) => {
-          const sessionId = row.voiceSessionId;
-          return sessionId && isValidUUID(sessionId);
-        });
-
-        const voiceDataMap = new Map<string, { transcript: string; audioUrl?: string }>();
-
-        if (voiceRows.length > 0) {
-          const voiceResults = await Promise.all(
-            voiceRows.map(async (row) => {
+            let session = sessionCache.get(sessionId);
+            if (session === undefined) {
               try {
-                const session = await getVoiceSessionById(row.voiceSessionId!);
-                return {
-                  id: row.id,
-                  transcript: session.transcriptionClean ?? "",
-                  audioUrl: session.cloudinaryUrl,
-                };
-              } catch (err) {
-                console.warn(`Failed to fetch voice session ${row.voiceSessionId}:`, err);
-                return { id: row.id, transcript: "", audioUrl: undefined };
+                session = await getVoiceSessionById(sessionId);
+              } catch {
+                session = null;
               }
-            })
-          );
+              sessionCache.set(sessionId, session);
+            }
 
-          voiceResults.forEach((result) => {
-            voiceDataMap.set(result.id, {
-              transcript: result.transcript,
-              audioUrl: result.audioUrl,
-            });
-          });
-        }
+            if (!session) return row;
 
-        // Merge voice data back into grouped rows
-        const withVoice: LedgerRow[] = grouped.map((row) => {
-          const voiceInfo = voiceDataMap.get(row.id);
-          if (voiceInfo) {
             return {
               ...row,
-              transcript: voiceInfo.transcript || row.transcript,
-              audioUrl: voiceInfo.audioUrl,
+              transcript: session.transcriptionClean ?? row.transcript,
+              audioUrl: session.cloudinaryUrl,
             };
-          }
-          return row;
-        });
+          })
+        );
 
         setEntries(withVoice);
       } finally {

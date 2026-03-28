@@ -8,21 +8,17 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const [mode, setMode] = useState<"password" | "otp">("password");
-  const [phone, setPhone] = useState("");
+  const { adminLogin } = useAuth();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!phone) e.phone = "Phone/Email is required";
-    if (mode === "password" && !password) e.password = "Password is required";
-    if (mode === "otp" && otpSent && !otp) e.otp = "OTP is required";
+    if (!email) e.email = "Email is required";
+    if (!password) e.password = "Password is required";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -31,23 +27,11 @@ export default function LoginPage() {
     e.preventDefault();
     if (!validate()) return;
 
-    if (mode === "otp" && !otpSent) {
-      setLoading(true);
-      setTimeout(() => { setOtpSent(true); setLoading(false); }, 1000);
-      return;
-    }
-
-    if (mode === "otp" && otpSent) {
-      // OTP verification coming soon
-      return;
-    }
-
-    // Password mode: real API call
     setLoading(true);
     setApiError(null);
     try {
-      await login(phone, password);
-      navigate("/dashboard");
+      await adminLogin(email, password);
+      navigate("/admin");
     } catch (err: any) {
       setApiError(err.message || "Login failed. Please try again.");
     } finally {
@@ -79,61 +63,26 @@ export default function LoginPage() {
         </div>
 
         <div className="brutal-card p-6">
-          {/* Mode Toggle */}
-          <div className="flex mb-6 brutal-border overflow-hidden">
-            <button
-              type="button"
-              onClick={() => { setMode("password"); setOtpSent(false); }}
-              className={`flex-1 py-2.5 text-sm font-bold transition-colors ${mode === "password" ? "bg-primary text-primary-foreground" : "bg-card"}`}
-            >
-              Password
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("otp")}
-              className={`flex-1 py-2.5 text-sm font-bold border-l-[3px] border-foreground transition-colors ${mode === "otp" ? "bg-primary text-primary-foreground" : "bg-card"}`}
-            >
-              OTP
-            </button>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <BrutalInput
               label="Phone / Email"
               placeholder="Enter phone or email"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              error={errors.phone}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              error={errors.email}
             />
 
-            {mode === "password" && (
-              <BrutalInput
-                label="Password"
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                error={errors.password}
-              />
-            )}
-
-            {mode === "otp" && otpSent && (
-              <BrutalInput
-                label="Enter OTP"
-                placeholder="6-digit OTP"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                error={errors.otp}
-                maxLength={6}
-              />
-            )}
-
-            {mode === "otp" && (
-              <p className="text-xs text-muted-foreground font-medium">OTP login coming soon.</p>
-            )}
+            <BrutalInput
+              label="Password"
+              type="password"
+              placeholder="Enter password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              error={errors.password}
+            />
 
             <BrutalButton type="submit" variant="primary" className="w-full" loading={loading}>
-              {mode === "otp" && !otpSent ? "Send OTP" : "Login"}
+              Login
             </BrutalButton>
 
             {apiError && (
@@ -142,7 +91,6 @@ export default function LoginPage() {
           </form>
 
           <p className="text-center mt-4 text-sm font-medium text-muted-foreground">
-            Don't have an account?{" "}
             <Link to="/signup" className="text-primary font-bold underline">Sign Up</Link>
           </p>
         </div>

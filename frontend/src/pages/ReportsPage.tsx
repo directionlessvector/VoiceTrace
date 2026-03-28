@@ -11,6 +11,82 @@ import QRCode from "qrcode";
 
 type Rgb = [number, number, number];
 
+type Period = "Weekly" | "Monthly";
+
+type DailyReportPoint = {
+  date: string;
+  day: string;
+  earnings: number;
+  expenses: number;
+};
+
+function toSafeAmount(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function dateToKeyLocal(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatRangeDate(dateKey: string): string {
+  const d = new Date(`${dateKey}T00:00:00`);
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function getPeriodRange(period: Period): { fromDate: string; toDate: string; label: string } {
+  const today = new Date();
+  const toDate = dateToKeyLocal(today);
+
+  if (period === "Weekly") {
+    const from = new Date(today);
+    from.setDate(from.getDate() - 6);
+    const fromDate = dateToKeyLocal(from);
+    return {
+      fromDate,
+      toDate,
+      label: `${formatRangeDate(fromDate)} - ${formatRangeDate(toDate)}`,
+    };
+  }
+
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const fromDate = dateToKeyLocal(monthStart);
+  return {
+    fromDate,
+    toDate,
+    label: `${formatRangeDate(fromDate)} - ${formatRangeDate(toDate)}`,
+  };
+}
+
+function buildDailySeries(entries: LedgerEntry[], fromDate: string, toDate: string): DailyReportPoint[] {
+  const map = new Map<string, DailyReportPoint>();
+  const dayAbbr = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const start = new Date(`${fromDate}T00:00:00`);
+  const end = new Date(`${toDate}T00:00:00`);
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const key = dateToKeyLocal(d);
+    map.set(key, { day: dayAbbr[d.getDay()], date: key, earnings: 0, expenses: 0 });
+  }
+
+  for (const entry of entries) {
+    const row = map.get(entry.entryDate);
+    if (!row) continue;
+    const amount = toSafeAmount(entry.amount);
+    if (entry.entryType === "sale" || entry.entryType === "income") {
+      row.earnings += amount;
+    } else {
+      row.expenses += amount;
+    }
+  }
+
+  return [...map.values()];
+}
+
 function hslCssVarToRgb(varName: string, fallback: Rgb): Rgb {
   const rootStyles = getComputedStyle(document.documentElement);
   const raw = rootStyles.getPropertyValue(varName).trim();
@@ -58,12 +134,12 @@ function buildTopItems(entries: LedgerEntry[]) {
   for (const entry of entries) {
     if (entry.entryType !== "sale" && entry.entryType !== "income") continue;
     const key = entry.itemName?.trim() || "Unknown";
-    totals.set(key, (totals.get(key) || 0) + Number(entry.amount));
+    totals.set(key, (totals.get(key) || 0) + toSafeAmount(entry.amount));
   }
   return [...totals.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
-    .map(([name, total]) => `${name}: ₹${Math.round(total)}`);
+    .map(([name, total]) => `${name}: Rs ${Math.round(total)}`);
 }
 
 function buildExpenseBreakdown(entries: LedgerEntry[]) {
@@ -71,12 +147,12 @@ function buildExpenseBreakdown(entries: LedgerEntry[]) {
   for (const entry of entries) {
     if (entry.entryType !== "expense" && entry.entryType !== "purchase") continue;
     const key = entry.itemName?.trim() || "Unknown";
-    totals.set(key, (totals.get(key) || 0) + Number(entry.amount));
+    totals.set(key, (totals.get(key) || 0) + toSafeAmount(entry.amount));
   }
   return [...totals.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
-    .map(([name, total]) => `${name}: ₹${Math.round(total)}`);
+    .map(([name, total]) => `${name}: Rs ${Math.round(total)}`);
 }
 
 function buildInsights(
@@ -90,7 +166,7 @@ function buildInsights(
   return [
     `Net margin is ${margin.toFixed(1)}% for this period.`,
     bestDay
-      ? `Highest earning day: ${bestDay.day} (₹${bestDay.earnings.toLocaleString()}).`
+      ? `Highest earning day: ${bestDay.day} (Rs ${bestDay.earnings.toLocaleString()}).`
       : "No daily data available yet.",
     totalExpenses > totalEarnings * 0.6
       ? "Expenses are relatively high. Review purchase and transport costs."
@@ -138,7 +214,7 @@ export default function ReportsPage() {
         for (const entry of data) {
           const row = map.get(entry.entryDate);
           if (!row) continue;
-          const amount = Number(entry.amount);
+          const amount = toSafeAmount(entry.amount);
           if (entry.entryType === "sale" || entry.entryType === "income") {
             row.earnings += amount;
           } else {
@@ -168,9 +244,13 @@ export default function ReportsPage() {
 
   const formatCurrency = (value: number) => `₹${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
-  const downloadCsv = () => {
+  const downloadCsv = async () => {
+    const { fromDate, toDate } = getPeriodRange("Monthly");
+    const monthlyEntries = await listCurrentUserLedgerEntries({ fromDate, toDate });
+    const series = buildDailySeries(monthlyEntries, fromDate, toDate);
+
     const headers = ["Day", "Earnings", "Expenses", "Profit"];
-    const rows = weeklyInsights.map((day) => [
+    const rows = series.map((day) => [
       day.day,
       day.earnings.toString(),
       day.expenses.toString(),
@@ -190,20 +270,26 @@ export default function ReportsPage() {
 
   const downloadExport = (kind: "pdf" | "csv") => {
     if (kind === "csv") {
-      downloadCsv();
+      void downloadCsv();
       return;
     }
     void handleDownload("Weekly");
   };
 
-  const handleDownload = async (type: "Weekly" | "Monthly") => {
+  const handleDownload = async (type: Period) => {
     try {
       setDownloading(type);
 
-      const isMonthly = type === "Monthly";
-      const multiplier = isMonthly ? 4 : 1;
-      const totalEarnings = weeklyTotal * multiplier;
-      const totalExpenses = weeklyExpenses * multiplier;
+      const { fromDate, toDate, label: dateRangeLabel } = getPeriodRange(type);
+      const periodEntries = await listCurrentUserLedgerEntries({ fromDate, toDate });
+      const dailySeries = buildDailySeries(periodEntries, fromDate, toDate);
+
+      const totalEarnings = periodEntries
+        .filter((e) => e.entryType === "sale" || e.entryType === "income")
+        .reduce((sum, e) => sum + toSafeAmount(e.amount), 0);
+      const totalExpenses = periodEntries
+        .filter((e) => e.entryType === "expense" || e.entryType === "purchase")
+        .reduce((sum, e) => sum + toSafeAmount(e.amount), 0);
       const profit = totalEarnings - totalExpenses;
 
       const [primary, accent, success, muted, black] = [
@@ -264,7 +350,7 @@ export default function ReportsPage() {
       const vendorLines = [
         `Name: ${user?.name ?? "Unknown"}`,
         `Business: ${user?.businessType ?? "Business"}`,
-        `Date Range: ${isMonthly ? "March 2026" : "March 22 - March 28, 2026"}`,
+        `Date Range: ${dateRangeLabel}`,
       ];
       addPageIfNeeded(vendorLines.length * lineHeight + sectionGap);
       vendorLines.forEach((line) => {
@@ -293,9 +379,9 @@ export default function ReportsPage() {
         doc.setFontSize(11);
         doc.text(value, x + 3, summaryY + 13);
       };
-      drawMetric(margin, "Total Earnings", `₹${Math.round(totalEarnings).toLocaleString()}`, primary);
-      drawMetric(margin + boxW + boxGap, "Total Expenses", `₹${Math.round(totalExpenses).toLocaleString()}`, [220, 38, 38]);
-      drawMetric(margin + (boxW + boxGap) * 2, "Net Profit", `₹${Math.round(profit).toLocaleString()}`, success);
+      drawMetric(margin, "Total Earnings", `Rs ${Math.round(totalEarnings).toLocaleString()}`, primary);
+      drawMetric(margin + boxW + boxGap, "Total Expenses", `Rs ${Math.round(totalExpenses).toLocaleString()}`, [220, 38, 38]);
+      drawMetric(margin + (boxW + boxGap) * 2, "Net Profit", `Rs ${Math.round(profit).toLocaleString()}`, success);
       y += boxH + sectionGap;
 
       // Two-column section (Top Items + Expenses)
@@ -344,15 +430,15 @@ export default function ReportsPage() {
         return colY;
       };
 
-      yLeft = drawColumnList(leftX, "Top Items", buildTopItems(entries), yLeft);
-      yRight = drawColumnList(rightX, "Expense Breakdown", buildExpenseBreakdown(entries), yRight);
+      yLeft = drawColumnList(leftX, "Top Items", buildTopItems(periodEntries), yLeft);
+      yRight = drawColumnList(rightX, "Expense Breakdown", buildExpenseBreakdown(periodEntries), yRight);
       y = Math.max(yLeft, yRight) + sectionGap;
 
       // Insights
       drawSectionTitle("Key Insights");
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
-      const insights = buildInsights(totalEarnings, totalExpenses, profit, weeklyInsights);
+      const insights = buildInsights(totalEarnings, totalExpenses, profit, dailySeries);
       insights.forEach((insight) => {
         const wrapped = doc.splitTextToSize(`- ${insight}`, contentWidth);
         const blockHeight = wrapped.length * lineHeight;
@@ -379,7 +465,7 @@ export default function ReportsPage() {
       doc.text("Profit", margin + 144, y + 4.7);
       y += headerRowH;
 
-      const tableRows = weeklyInsights;
+      const tableRows = dailySeries;
       tableRows.forEach((r) => {
         const rowH = 6.5;
         addPageIfNeeded(rowH);
@@ -392,10 +478,10 @@ export default function ReportsPage() {
         doc.setFontSize(8.8);
         doc.setTextColor(black[0], black[1], black[2]);
         doc.text(r.day, margin + 2, y + 4.2);
-        doc.text(`₹${r.earnings}`, margin + 48, y + 4.2);
-        doc.text(`₹${r.expenses}`, margin + 96, y + 4.2);
+        doc.text(`Rs ${Math.round(r.earnings)}`, margin + 48, y + 4.2);
+        doc.text(`Rs ${Math.round(r.expenses)}`, margin + 96, y + 4.2);
         doc.setTextColor(success[0], success[1], success[2]);
-        doc.text(`₹${profitDay}`, margin + 144, y + 4.2);
+        doc.text(`Rs ${Math.round(profitDay)}`, margin + 144, y + 4.2);
         y += rowH;
       });
       y += sectionGap;
@@ -406,6 +492,11 @@ export default function ReportsPage() {
       const qrPayload = JSON.stringify({
         reportId,
         timestamp,
+        fromDate,
+        toDate,
+        totalEarnings,
+        totalExpenses,
+        profit,
         url: `${window.location.origin}/reports`,
       });
       const qrDataUrl = await QRCode.toDataURL(qrPayload, { margin: 1, width: 220 });
@@ -426,6 +517,8 @@ export default function ReportsPage() {
       doc.addImage(qrDataUrl, "PNG", pageWidth - margin - qrSize, footerY + 3, qrSize, qrSize);
 
       doc.save(`VoiceTrace-${type.toLowerCase()}-report.pdf`);
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "Failed to generate report");
     } finally {
       setDownloading(null);
     }
@@ -468,7 +561,7 @@ export default function ReportsPage() {
               >
                 <Download size={16} /> Generate PDF
               </BrutalButton>
-              <BrutalButton variant="outline" className="w-full sm:w-auto" onClick={downloadCsv}>
+              <BrutalButton variant="outline" className="w-full sm:w-auto" onClick={() => void downloadCsv()}>
                 CSV Export
               </BrutalButton>
             </div>

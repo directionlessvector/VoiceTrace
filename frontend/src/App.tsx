@@ -10,6 +10,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import DashboardPage from "./pages/DashboardPage";
 import LedgerPage from "./pages/LedgerPage";
+import UploadLedgerPage from "./pages/UploadLedgerPage";
 import UdhaarBookPage from "./pages/UdhaarBookPage";
 import InsightsPage from "./pages/InsightsPage";
 import SuggestionsPage from "./pages/SuggestionsPage";
@@ -38,6 +39,7 @@ const App = () => (
             {/* Protected routes */}
             <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             <Route path="/ledger" element={<ProtectedRoute><LedgerPage /></ProtectedRoute>} />
+            <Route path="/upload-ledger" element={<ProtectedRoute><UploadLedgerPage /></ProtectedRoute>} />
             <Route path="/udhaar" element={<ProtectedRoute><UdhaarBookPage /></ProtectedRoute>} />
             <Route path="/insights" element={<ProtectedRoute><InsightsPage /></ProtectedRoute>} />
             <Route path="/suggestions" element={<ProtectedRoute><SuggestionsPage /></ProtectedRoute>} />
@@ -45,7 +47,7 @@ const App = () => (
             <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
             <Route path="/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-            <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
