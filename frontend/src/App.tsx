@@ -8,6 +8,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import DashboardPage from "./pages/DashboardPage";
 import LedgerPage from "./pages/LedgerPage";
+import UdhaarBookPage from "./pages/UdhaarBookPage";
 import InsightsPage from "./pages/InsightsPage";
 import SuggestionsPage from "./pages/SuggestionsPage";
 import ReportsPage from "./pages/ReportsPage";
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/ledger" element={<LedgerPage />} />
+          <Route path="/udhaar" element={<UdhaarBookPage />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/suggestions" element={<SuggestionsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
