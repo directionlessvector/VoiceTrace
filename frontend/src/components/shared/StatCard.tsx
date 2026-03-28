@@ -7,7 +7,7 @@ interface StatCardProps {
   icon: LucideIcon;
   trend?: "up" | "down" | "neutral";
   trendValue?: string;
-  variant?: "default" | "earnings" | "expenses" | "profit";
+  variant?: "default" | "earnings" | "expenses" | "profit" | "pending";
 }
 
 export function StatCard({ title, value, icon: Icon, trend, trendValue, variant = "default" }: StatCardProps) {
@@ -16,6 +16,7 @@ export function StatCard({ title, value, icon: Icon, trend, trendValue, variant 
     earnings: "bg-success/10",
     expenses: "bg-destructive/10",
     profit: "bg-secondary/10",
+    pending: "bg-warning/10",
   };
 
   const iconStyles = {
@@ -23,6 +24,7 @@ export function StatCard({ title, value, icon: Icon, trend, trendValue, variant 
     earnings: "text-success",
     expenses: "text-destructive",
     profit: "text-secondary",
+    pending: "text-warning",
   };
 
   return (

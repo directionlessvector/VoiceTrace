@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { customers, customerLedger } from "../db/schema";
 
@@ -74,6 +74,26 @@ export async function getCustomerLedger(customerId: string) {
     .orderBy(desc(customerLedger.txnDate));
 }
 
+// All ledger entries for a user across all customers
+export async function listAllCustomerLedger(userId: string) {
+  return db
+    .select({
+      id: customerLedger.id,
+      customerId: customerLedger.customerId,
+      txnType: customerLedger.txnType,
+      amount: customerLedger.amount,
+      description: customerLedger.description,
+      txnDate: customerLedger.txnDate,
+      createdAt: customerLedger.createdAt,
+      customerName: customers.name,
+      customerPhone: customers.phone,
+    })
+    .from(customerLedger)
+    .leftJoin(customers, eq(customers.id, customerLedger.customerId))
+    .where(eq(customerLedger.userId, userId))
+    .orderBy(desc(customerLedger.txnDate));
+}
+
 // Net balance for a customer: positive = customer owes vendor
 export async function getCustomerBalance(customerId: string) {
   const [row] = await db
@@ -88,17 +108,47 @@ export async function getCustomerBalance(customerId: string) {
   return { customerId, balance: row?.balance ?? "0" };
 }
 
-// All customers with outstanding balances for a vendor
+// All customers with outstanding balances, total collected, and last txn date for a vendor
 export async function listCustomerBalances(userId: string) {
   return db
     .select({
       customerId: customerLedger.customerId,
       balance: sql<string>`
-        sum(case when ${customerLedger.txnType} = 'credit' then ${customerLedger.amount}
-                 else -${customerLedger.amount} end)
+        coalesce(sum(case when ${customerLedger.txnType} = 'credit' then ${customerLedger.amount}
+                          else -${customerLedger.amount} end), '0')
       `,
+      totalDebits: sql<string>`
+        coalesce(sum(case when ${customerLedger.txnType} = 'debit' then ${customerLedger.amount} else 0 end), '0')
+      `,
+      lastTxnDate: sql<string | null>`max(${customerLedger.txnDate})`,
     })
     .from(customerLedger)
     .where(eq(customerLedger.userId, userId))
     .groupBy(customerLedger.customerId);
+}
+
+// Customers with balance, total debits (collected), and last txn date
+export async function listCustomerSummary(userId: string) {
+  return db
+    .select({
+      id: customers.id,
+      name: customers.name,
+      phone: customers.phone,
+      address: customers.address,
+      notes: customers.notes,
+      createdAt: customers.createdAt,
+      balance: sql<string>`
+        coalesce(sum(case when ${customerLedger.txnType} = 'credit' then ${customerLedger.amount}
+                          else -${customerLedger.amount} end), '0')
+      `,
+      totalDebits: sql<string>`
+        coalesce(sum(case when ${customerLedger.txnType} = 'debit' then ${customerLedger.amount} else 0 end), '0')
+      `,
+      lastTxnDate: sql<string | null>`max(${customerLedger.txnDate})`,
+    })
+    .from(customers)
+    .leftJoin(customerLedger, eq(customerLedger.customerId, customers.id))
+    .where(eq(customers.userId, userId))
+    .groupBy(customers.id)
+    .orderBy(customers.name);
 }

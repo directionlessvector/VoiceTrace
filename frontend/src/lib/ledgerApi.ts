@@ -20,9 +20,26 @@ export type VoiceSession = {
   languageDetected: string | null;
 };
 
-export async function listCurrentUserLedgerEntries(): Promise<LedgerEntry[]> {
+export async function listCurrentUserLedgerEntries(filters?: {
+  fromDate?: string;
+  toDate?: string;
+}): Promise<LedgerEntry[]> {
   const userId = await resolveActiveUserId();
-  return fetchJson<LedgerEntry[]>(`/ledger/user/${userId}`);
+  const params = new URLSearchParams();
+  if (filters?.fromDate) params.set("fromDate", filters.fromDate);
+  if (filters?.toDate) params.set("toDate", filters.toDate);
+  const qs = params.toString();
+  return fetchJson<LedgerEntry[]>(`/ledger/user/${userId}${qs ? `?${qs}` : ""}`);
+}
+
+export async function getUserLedgerSummary(fromDate?: string, toDate?: string) {
+  const userId = await resolveActiveUserId();
+  const params = new URLSearchParams();
+  if (fromDate) params.set("fromDate", fromDate);
+  if (toDate) params.set("toDate", toDate);
+  return fetchJson<Array<{ entryType: string; total: string; count: string }>>(
+    `/ledger/user/${userId}/summary?${params}`
+  );
 }
 
 export async function getVoiceSessionById(sessionId: string): Promise<VoiceSession> {

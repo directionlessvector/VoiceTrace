@@ -10,6 +10,7 @@ export const businessTypeEnum = pgEnum("business_type", [
 export const users = pgTable("users", {
   id:                   uuid("id").primaryKey().defaultRandom(),
   phone:                text("phone").notNull().unique(),
+  passwordHash:         text("password_hash"),
   name:                 text("name").notNull(),
   businessName:         text("business_name"),
   businessType:         businessTypeEnum("business_type"),

@@ -105,11 +105,14 @@ function groupEntriesByDay(entries: LedgerEntry[]): LedgerRow[] {
   return [...grouped.values()].sort((a, b) => b.date.localeCompare(a.date));
 }
 
+const PAGE_SIZE = 10;
+
 export default function LedgerPage() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [entries, setEntries] = useState<LedgerRow[]>([]);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [sortBy, setSortBy] = useState<"date" | "earnings" | "expenses" | "profit">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [sourceFilter, setSourceFilter] = useState<"all" | "voice" | "ocr" | "manual">("all");
@@ -206,7 +209,16 @@ export default function LedgerPage() {
     setSortOrder("desc");
     setFromDate("");
     setToDate("");
+    setVisibleCount(PAGE_SIZE);
   };
+
+  // Reset pagination whenever filters/sort change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, sourceFilter, typeFilter, fromDate, toDate, sortBy, sortOrder]);
+
+  const visibleEntries = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visibleCount;
 
   const openEntry = (entry: LedgerRow) => {
     setSelectedEntry(entry);
@@ -375,7 +387,7 @@ export default function LedgerPage() {
           </BrutalCard>
         ) : (
           <div className="space-y-3">
-            {filtered.map((entry) => (
+            {visibleEntries.map((entry) => (
               <BrutalCard key={entry.id} className="cursor-pointer hover:translate-x-0.5 hover:translate-y-0.5 transition-transform" onClick={() => openEntry(entry)}>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
@@ -397,6 +409,13 @@ export default function LedgerPage() {
                 </div>
               </BrutalCard>
             ))}
+            {hasMore && (
+              <div className="text-center pt-2">
+                <BrutalButton variant="outline" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
+                  Load More ({filtered.length - visibleCount} remaining)
+                </BrutalButton>
+              </div>
+            )}
           </div>
         )}
       </div>
