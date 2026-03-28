@@ -1,7 +1,36 @@
 import { Router, Request, Response } from "express";
+import multer from "multer";
 import * as ctrl from "../controllers/voice.controller";
+import { processVoiceAudio } from "../services/voice-processing.service";
 
 const router = Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
+
+router.post("/process", upload.single("audio"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "audio file is required (form field: audio)" });
+    }
+
+    const result = await processVoiceAudio({
+      buffer: req.file.buffer,
+      filename: req.file.originalname,
+      mimeType: req.file.mimetype,
+    });
+
+    res.json({
+      ok: true,
+      transcript: result.transcript,
+      languageDetected: result.languageDetected,
+      structured: result.structured,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? "Failed to process voice audio" });
+  }
+});
 
 // ─── Voice Sessions ───────────────────────────────────────────────────────────
 

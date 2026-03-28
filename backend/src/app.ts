@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors";
 
 import usersRouter       from "./routes/users.routes";
 import voiceRouter       from "./routes/voice.routes";
@@ -14,7 +15,11 @@ import adminRouter       from "./routes/admin.routes";
 
 const app = express();
 
+app.use(cors({
+	origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : true,
+}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use("/users",        usersRouter);
 app.use("/voice",        voiceRouter);
