@@ -8,19 +8,70 @@ import { VoiceRecorderModal } from "@/components/shared/VoiceRecorderModal";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
 import { dashboardStats, recentActivity, currentUser } from "@/data/mockData";
 import type { VoiceProcessResponse } from "@/lib/voiceApi";
+import { createVoiceLedgerEntry } from "@/lib/ledgerApi";
+import { useToast } from "@/hooks/use-toast";
 import { DollarSign, TrendingDown, TrendingUp, Mic, Lightbulb } from "lucide-react";
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 1200);
     return () => clearTimeout(t);
   }, []);
 
-  const handleSave = (result: VoiceProcessResponse) => {
-    console.log("Voice parse result:", result);
+  const handleSave = async (result: VoiceProcessResponse) => {
+    if (!result.voiceSessionId) {
+      toast({
+        title: "Could not save entries",
+        description: "Missing voice session id from API response.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const tasks = [
+      ...result.structured.earnings.map((row) =>
+        createVoiceLedgerEntry({
+          voiceSessionId: result.voiceSessionId!,
+          entryType: "sale",
+          amount: row.amount,
+          quantity: row.quantity,
+          unit: row.unit,
+          itemName: row.label,
+          notes: row.sourceText,
+          confidence: row.confidence,
+        })
+      ),
+      ...result.structured.expenses.map((row) =>
+        createVoiceLedgerEntry({
+          voiceSessionId: result.voiceSessionId!,
+          entryType: "expense",
+          amount: row.amount,
+          quantity: row.quantity,
+          unit: row.unit,
+          itemName: row.label,
+          notes: row.sourceText,
+          confidence: row.confidence,
+        })
+      ),
+    ];
+
+    try {
+      await Promise.all(tasks);
+      toast({
+        title: "Saved",
+        description: `Saved ${tasks.length} ledger entries from voice note.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: error instanceof Error ? error.message : "Could not save ledger entries",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {

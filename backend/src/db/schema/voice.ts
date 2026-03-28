@@ -3,6 +3,7 @@ import { users } from "./users";
 
 export const sessionTypeEnum = pgEnum("session_type", [
   "ledger_entry",
+  "ledger_upload",
   "stock_update",
   "customer_update",
   "query",
