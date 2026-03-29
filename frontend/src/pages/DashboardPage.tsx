@@ -8,19 +8,94 @@ import { BrutalModal } from "@/components/shared/BrutalModal";
 import { VoiceRecorderModal } from "@/components/shared/VoiceRecorderModal";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
 import { startVoiceAssistantCall, type VoiceProcessResponse } from "@/lib/voiceApi";
-import { createVoiceLedgerEntry, listCurrentUserLedgerEntries, type LedgerEntry } from "@/lib/ledgerApi";
+import { createVoiceLedgerEntry, listCurrentUserLedgerEntries, type LedgerEntry, updateLedgerEntryById } from "@/lib/ledgerApi";
+import { createVoiceFlag, listPendingVoiceFlags, resolveVoiceFlag, type VoiceFlag } from "@/lib/voiceFlagsApi";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { DollarSign, TrendingDown, TrendingUp, Mic, Lightbulb, PhoneCall } from "lucide-react";
+
+type TrendInfo = {
+  trend: "up" | "down" | "neutral";
+  value: string;
+};
+
+type SuggestedCorrection = {
+  label?: string;
+  amount?: number;
+  quantity?: number;
+  unit?: string;
+  entryType?: "sale" | "expense";
+};
+
+function parseSuggestedCorrection(raw: string | null): SuggestedCorrection | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as SuggestedCorrection;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatPercent(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded.toFixed(0)}%` : `${rounded.toFixed(1)}%`;
+}
+
+function calculateTrend(current: number, previous: number, invertDirection = false): TrendInfo {
+  if (previous === 0 && current === 0) {
+    return { trend: "neutral", value: "0% vs last week" };
+  }
+
+  if (previous === 0) {
+    const rawTrend = current > 0 ? "up" : current < 0 ? "down" : "neutral";
+    const trend = invertDirection
+      ? rawTrend === "up"
+        ? "down"
+        : rawTrend === "down"
+          ? "up"
+          : "neutral"
+      : rawTrend;
+    return { trend, value: "new vs last week" };
+  }
+
+  const changePct = ((current - previous) / previous) * 100;
+  const rawTrend = changePct > 0 ? "up" : changePct < 0 ? "down" : "neutral";
+  const trend = invertDirection
+    ? rawTrend === "up"
+      ? "down"
+      : rawTrend === "down"
+        ? "up"
+        : "neutral"
+    : rawTrend;
+
+  return {
+    trend,
+    value: `${formatPercent(Math.abs(changePct))} vs last week`,
+  };
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ earnings: 0, expenses: 0, profit: 0 });
+  const [trends, setTrends] = useState<{
+    earnings: TrendInfo;
+    expenses: TrendInfo;
+    profit: TrendInfo;
+  }>({
+    earnings: { trend: "neutral", value: "0% vs last week" },
+    expenses: { trend: "neutral", value: "0% vs last week" },
+    profit: { trend: "neutral", value: "0% vs last week" },
+  });
   const [recentEntries, setRecentEntries] = useState<LedgerEntry[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
   const [isCalling, setIsCalling] = useState(false);
+  const [flagPromptOpen, setFlagPromptOpen] = useState(false);
+  const [pendingFlag, setPendingFlag] = useState<VoiceFlag | null>(null);
+  const [clarificationValue, setClarificationValue] = useState("");
+  const [flagSubmitting, setFlagSubmitting] = useState(false);
   const [callNumber, setCallNumber] = useState(user?.phone ?? "");
   const { toast } = useToast();
 
@@ -43,6 +118,58 @@ export default function DashboardPage() {
         profit: earnings - expenses 
       });
 
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const currentWeekStart = new Date(today);
+      currentWeekStart.setDate(currentWeekStart.getDate() - 6);
+
+      const previousWeekEnd = new Date(currentWeekStart);
+      previousWeekEnd.setDate(previousWeekEnd.getDate() - 1);
+
+      const previousWeekStart = new Date(previousWeekEnd);
+      previousWeekStart.setDate(previousWeekStart.getDate() - 6);
+
+      const currentWeekEntries = entries.filter((entry) => {
+        const dt = new Date(entry.entryDate);
+        if (Number.isNaN(dt.getTime())) return false;
+        dt.setHours(0, 0, 0, 0);
+        return dt >= currentWeekStart && dt <= today;
+      });
+
+      const previousWeekEntries = entries.filter((entry) => {
+        const dt = new Date(entry.entryDate);
+        if (Number.isNaN(dt.getTime())) return false;
+        dt.setHours(0, 0, 0, 0);
+        return dt >= previousWeekStart && dt <= previousWeekEnd;
+      });
+
+      const currentWeekEarnings = currentWeekEntries
+        .filter((e) => e.entryType === "sale" || e.entryType === "income")
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+
+      const previousWeekEarnings = previousWeekEntries
+        .filter((e) => e.entryType === "sale" || e.entryType === "income")
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+
+      const currentWeekExpenses = currentWeekEntries
+        .filter((e) => e.entryType === "expense" || e.entryType === "purchase")
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+
+      const previousWeekExpenses = previousWeekEntries
+        .filter((e) => e.entryType === "expense" || e.entryType === "purchase")
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+
+      const currentWeekProfit = currentWeekEarnings - currentWeekExpenses;
+      const previousWeekProfit = previousWeekEarnings - previousWeekExpenses;
+
+      setTrends({
+        earnings: calculateTrend(currentWeekEarnings, previousWeekEarnings),
+        // Lower expenses are better, so invert trend direction for this card.
+        expenses: calculateTrend(currentWeekExpenses, previousWeekExpenses, true),
+        profit: calculateTrend(currentWeekProfit, previousWeekProfit),
+      });
+
       const recent = [...entries]
         .sort((a, b) => b.entryDate.localeCompare(a.entryDate))
         .slice(0, 5);
@@ -57,6 +184,104 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboardData().finally(() => setLoading(false));
   }, [fetchDashboardData]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const flags = await listPendingVoiceFlags();
+        if (!mounted || !flags.length) return;
+        setPendingFlag(flags[0]);
+        setFlagPromptOpen(true);
+      } catch {
+        // Ignore prompt fetch issues and keep dashboard usable.
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleAcceptFlag = async () => {
+    if (!pendingFlag) return;
+    setFlagSubmitting(true);
+    try {
+      await resolveVoiceFlag(pendingFlag.id, { correctionStatus: "accepted" });
+      setFlagPromptOpen(false);
+      setPendingFlag(null);
+      setClarificationValue("");
+      toast({
+        title: "Clarification saved",
+        description: "Marked as approximate and kept in records.",
+      });
+    } catch (error) {
+      toast({
+        title: "Could not save clarification",
+        description: error instanceof Error ? error.message : "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setFlagSubmitting(false);
+    }
+  };
+
+  const handleCorrectFlag = async () => {
+    if (!pendingFlag) return;
+    const corrected = clarificationValue.trim();
+    if (!corrected) {
+      toast({
+        title: "Value required",
+        description: "Enter corrected amount/value before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setFlagSubmitting(true);
+    try {
+      const suggestion = parseSuggestedCorrection(pendingFlag.suggestedCorrection);
+      const amountNum = Number(corrected);
+
+      const entries = await listCurrentUserLedgerEntries();
+      const candidate = entries.find((entry) => {
+        if (entry.voiceSessionId !== pendingFlag.voiceSessionId) return false;
+        if (!suggestion?.label || !entry.itemName) return true;
+        return entry.itemName.trim().toLowerCase() === suggestion.label.trim().toLowerCase();
+      });
+
+      if (candidate) {
+        await updateLedgerEntryById(candidate.id, {
+          amount: Number.isFinite(amountNum) ? amountNum.toFixed(2) : candidate.amount,
+          notes: `${candidate.notes ?? ""}${candidate.notes ? " | " : ""}corrected:${corrected}`,
+        });
+      }
+
+      await resolveVoiceFlag(pendingFlag.id, {
+        correctionStatus: "manually_corrected",
+        correctedValue: corrected,
+      });
+
+      setFlagPromptOpen(false);
+      setPendingFlag(null);
+      setClarificationValue("");
+      await fetchDashboardData();
+
+      toast({
+        title: "Correction saved",
+        description: "Updated your entry with the clarification.",
+      });
+    } catch (error) {
+      toast({
+        title: "Could not save correction",
+        description: error instanceof Error ? error.message : "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setFlagSubmitting(false);
+    }
+  };
 
   // Refresh dashboard after successful voice recording
   const handleSave = async (result: VoiceProcessResponse) => {
@@ -80,6 +305,7 @@ export default function DashboardPage() {
           itemName: row.label,
           notes: row.sourceText,
           confidence: row.confidence,
+          isApproximate: row.isApproximate,
         })
       ),
       ...result.structured.expenses.map((row) =>
@@ -92,16 +318,40 @@ export default function DashboardPage() {
           itemName: row.label,
           notes: row.sourceText,
           confidence: row.confidence,
+          isApproximate: row.isApproximate,
         })
       ),
     ];
 
+    const uncertainRows = [
+      ...result.structured.earnings.map((row) => ({ ...row, entryType: "sale" as const })),
+      ...result.structured.expenses.map((row) => ({ ...row, entryType: "expense" as const })),
+    ].filter((row) => row.isApproximate || row.confidence === "low" || row.amount <= 0);
+
     try {
       await Promise.all(tasks);
+
+      await Promise.all(
+        uncertainRows.map((row) =>
+          createVoiceFlag(result.voiceSessionId!, {
+            flagType: "unclear_speech",
+            originalText: row.sourceText || `${row.entryType} ${row.label}`,
+            suggestedCorrection: JSON.stringify({
+              entryType: row.entryType,
+              label: row.label,
+              amount: row.amount,
+              quantity: row.quantity,
+              unit: row.unit,
+            }),
+          })
+        )
+      );
       
       toast({
         title: "Saved",
-        description: `Saved ${tasks.length} ledger entries from voice note.`,
+        description: uncertainRows.length
+          ? `Saved ${tasks.length} ledger entries. ${uncertainRows.length} marked for clarification.`
+          : `Saved ${tasks.length} ledger entries from voice note.`,
       });
 
       // Refresh dashboard data (minimal extra API call)
@@ -191,24 +441,24 @@ export default function DashboardPage() {
             value={stats.earnings} 
             icon={DollarSign} 
             variant="earnings" 
-            trend="up" 
-            trendValue="12% vs last week" 
+            trend={trends.earnings.trend} 
+            trendValue={trends.earnings.value} 
           />
           <StatCard 
             title="Expenses" 
             value={stats.expenses} 
             icon={TrendingDown} 
             variant="expenses" 
-            trend="down" 
-            trendValue="5% vs last week" 
+            trend={trends.expenses.trend} 
+            trendValue={trends.expenses.value} 
           />
           <StatCard 
             title="Profit" 
             value={stats.profit} 
             icon={TrendingUp} 
             variant="profit" 
-            trend="up" 
-            trendValue="18% vs last week" 
+            trend={trends.profit.trend} 
+            trendValue={trends.profit.value} 
           />
         </div>
 
@@ -284,6 +534,35 @@ export default function DashboardPage() {
           <div className="flex justify-end">
             <BrutalButton variant="primary" onClick={handleStartCall} loading={isCalling}>
               <PhoneCall size={16} /> Start Call
+            </BrutalButton>
+          </div>
+        </div>
+      </BrutalModal>
+
+      <BrutalModal open={flagPromptOpen} onClose={() => setFlagPromptOpen(false)} title="Quick Clarification Needed">
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground font-medium">
+            We detected an approximate voice entry and saved it so nothing is lost.
+          </p>
+          <div className="brutal-card p-3 bg-muted/30">
+            <p className="font-bold text-sm">Uncertain line</p>
+            <p className="text-sm text-muted-foreground">{pendingFlag?.originalText ?? "No text available"}</p>
+          </div>
+          <p className="text-sm font-medium">
+            Is this entry okay as approximate? If not, enter corrected amount/value below.
+          </p>
+          <input
+            value={clarificationValue}
+            onChange={(e) => setClarificationValue(e.target.value)}
+            placeholder="Enter corrected amount/value"
+            className="w-full px-4 py-2.5 brutal-input"
+          />
+          <div className="flex flex-wrap justify-end gap-2">
+            <BrutalButton variant="outline" onClick={handleAcceptFlag} loading={flagSubmitting}>
+              Yes, keep approximate
+            </BrutalButton>
+            <BrutalButton variant="primary" onClick={handleCorrectFlag} loading={flagSubmitting}>
+              Submit correction
             </BrutalButton>
           </div>
         </div>

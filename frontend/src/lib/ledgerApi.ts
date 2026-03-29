@@ -55,12 +55,14 @@ export async function createVoiceLedgerEntry(data: {
   itemName?: string;
   notes?: string;
   confidence?: "high" | "medium" | "low";
+  isApproximate?: boolean;
 }) {
   const userId = await resolveActiveUserId();
   const today = new Date().toISOString().slice(0, 10);
 
   const confidenceNote = data.confidence ? `confidence:${data.confidence}` : undefined;
-  const mergedNotes = [data.notes, confidenceNote].filter(Boolean).join(" | ") || undefined;
+  const approximateNote = data.isApproximate ? "approximate:true" : undefined;
+  const mergedNotes = [data.notes, confidenceNote, approximateNote].filter(Boolean).join(" | ") || undefined;
 
   return fetchJson("/ledger", {
     method: "POST",
