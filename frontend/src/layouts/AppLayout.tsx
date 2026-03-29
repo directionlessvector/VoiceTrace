@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage, type AppLanguage } from "@/contexts/LanguageContext";
 import {
   LayoutDashboard, BookOpen, TrendingUp, Package, FileText,
   AlertTriangle, User, Shield, Menu, X, Mic, LogOut, Wallet, MapPin, Upload
@@ -8,19 +9,19 @@ import {
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { title: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-  { title: "Ledger", path: "/ledger", icon: BookOpen },
-  { title: "Upload Ledger", path: "/upload-ledger", icon: Upload },
-  { title: "UdhaarBook", path: "/udhaar", icon: Wallet },
-  { title: "Insights", path: "/insights", icon: TrendingUp },
-  { title: "Suggestions", path: "/suggestions", icon: Package },
-  { title: "Nearby Suppliers", path: "/nearby-suppliers", icon: MapPin },
-  { title: "Reports", path: "/reports", icon: FileText },
-  { title: "Alerts", path: "/alerts", icon: AlertTriangle },
-  { title: "Profile", path: "/profile", icon: User },
+  { titleKey: "nav.dashboard", path: "/dashboard", icon: LayoutDashboard },
+  { titleKey: "nav.ledger", path: "/ledger", icon: BookOpen },
+  { titleKey: "nav.uploadLedger", path: "/upload-ledger", icon: Upload },
+  { titleKey: "nav.udhaar", path: "/udhaar", icon: Wallet },
+  { titleKey: "nav.insights", path: "/insights", icon: TrendingUp },
+  { titleKey: "nav.suggestions", path: "/suggestions", icon: Package },
+  { titleKey: "nav.nearbySuppliers", path: "/nearby-suppliers", icon: MapPin },
+  { titleKey: "nav.reports", path: "/reports", icon: FileText },
+  { titleKey: "nav.alerts", path: "/alerts", icon: AlertTriangle },
+  { titleKey: "nav.profile", path: "/profile", icon: User },
 ];
 
-const adminItems = [{ title: "Admin Dashboard", path: "/admin", icon: Shield }];
+const adminItems = [{ titleKey: "nav.adminDashboard", path: "/admin", icon: Shield }];
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -31,6 +32,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, adminUser, logout } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const isAdminSession = !!adminUser;
 
   const handleLogout = () => {
@@ -83,7 +85,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 )}
               >
                 <item.icon size={18} />
-                {item.title}
+                {t(item.titleKey)}
               </Link>
             );
           })}
@@ -95,7 +97,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             className="flex w-full items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-bold hover:bg-destructive/10 text-destructive"
           >
             <LogOut size={18} />
-            Logout
+            {t("nav.logout")}
           </button>
         </div>
       </aside>
@@ -112,6 +114,22 @@ export function AppLayout({ children }: AppLayoutProps) {
           </button>
           <div className="hidden lg:block" />
           <div className="flex items-center gap-3">
+            {!isAdminSession && (
+              <div className="hidden sm:flex items-center gap-2">
+                <span className="text-xs font-bold text-muted-foreground">{t("nav.language")}</span>
+                <select
+                  value={language}
+                  onChange={(e) => void setLanguage(e.target.value as AppLanguage)}
+                  className="brutal-select px-2 py-1 text-xs font-bold"
+                >
+                  <option value="en">{t("lang.en")}</option>
+                  <option value="hi">{t("lang.hi")}</option>
+                  <option value="mr">{t("lang.mr")}</option>
+                  <option value="ta">{t("lang.ta")}</option>
+                  <option value="te">{t("lang.te")}</option>
+                </select>
+              </div>
+            )}
             <div className="w-8 h-8 bg-primary rounded-sm brutal-border flex items-center justify-center text-primary-foreground text-sm font-bold">
               {userInitial}
             </div>

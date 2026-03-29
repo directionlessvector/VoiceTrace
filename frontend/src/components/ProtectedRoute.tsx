@@ -12,6 +12,11 @@ export function ProtectedRoute({ children, adminOnly = false }: { children: Reac
     return <Navigate to="/login" replace />;
   }
 
+  // If an admin session exists, restrict app access to admin page only.
+  if (!adminOnly && adminUser) {
+    return <Navigate to="/admin" replace />;
+  }
+
   if (!adminOnly && !user) {
     return <Navigate to="/login" replace />;
   }

@@ -7,6 +7,7 @@ import { BrutalInput } from "@/components/shared/BrutalInput";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
 import { StatCard } from "@/components/shared/StatCard";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   listCustomers,
   listCustomerBalances,
@@ -48,6 +49,7 @@ function getStatus(c: CustomerWithBalance): "paid" | "pending" | "overdue" {
 
 export default function UdhaarBookPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [customers, setCustomers] = useState<CustomerWithBalance[]>([]);
@@ -180,9 +182,9 @@ export default function UdhaarBookPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-              <Wallet className="text-primary" /> UdhaarBook
+              <Wallet className="text-primary" /> {t("page.udhaar")}
             </h1>
-            <p className="text-muted-foreground font-medium mt-1">Track and recover customer udhaar efficiently.</p>
+            <p className="text-muted-foreground font-medium mt-1">{t("page.udhaarSubtitle")}</p>
           </div>
           <BrutalButton variant="primary" onClick={() => setAddOpen(true)}>
             <Plus size={18} /> Add Udhaar

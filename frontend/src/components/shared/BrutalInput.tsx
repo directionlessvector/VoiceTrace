@@ -33,7 +33,7 @@ export const BrutalSelect = forwardRef<HTMLSelectElement, BrutalSelectProps>(
       {label && <label className="text-sm font-bold uppercase tracking-wide">{label}</label>}
       <select
         ref={ref}
-        className={cn("w-full px-4 py-2.5 brutal-input bg-card", error && "border-destructive", className)}
+        className={cn("w-full px-4 py-2.5 brutal-select", error && "border-destructive", className)}
         {...props}
       >
         {children}

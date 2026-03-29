@@ -12,6 +12,7 @@ import {
   type OsmSupplier,
   type UserSupplier,
 } from "@/lib/nearbySuppliersApi";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { AlertTriangle, MapPin, Phone, RefreshCcw, Store } from "lucide-react";
 
 function toNumber(v: string | null | undefined): number | null {
@@ -33,6 +34,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 export default function NearbySuppliersPage() {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [searchItem, setSearchItem] = useState("");
   const [nearbyLoading, setNearbyLoading] = useState(false);
@@ -170,7 +172,7 @@ export default function NearbySuppliersPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-primary">Nearby Suppliers</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-primary">{t("page.nearbySuppliers")}</h1>
 
         <BrutalCard highlight={lowStock.length ? "warning" : "success"}>
           <div className="flex items-center gap-2 mb-3">

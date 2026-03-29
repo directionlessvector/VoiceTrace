@@ -6,10 +6,12 @@ import { BrutalButton } from "@/components/shared/BrutalButton";
 import { BrutalBadge } from "@/components/shared/BrutalBadge";
 import { processLedgerImage, type OcrLedgerResult } from "@/lib/ocrLedgerApi";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Upload, FileImage, Camera, CameraOff } from "lucide-react";
 
 export default function UploadLedgerPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [file, setFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -140,8 +142,8 @@ export default function UploadLedgerPage() {
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Upload Ledger</h1>
-          <p className="text-muted-foreground font-medium mt-1">Upload a ledger image, preview extraction, then confirm save.</p>
+          <h1 className="text-2xl md:text-3xl font-bold">{t("page.uploadLedger")}</h1>
+          <p className="text-muted-foreground font-medium mt-1">{t("page.uploadLedgerSubtitle")}</p>
         </div>
 
         <BrutalCard>

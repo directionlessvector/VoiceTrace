@@ -65,6 +65,12 @@ PORT=3000
 CORS_ORIGIN=http://localhost:5173,http://localhost:8080
 VOICE_DEFAULT_USER_ID=  # Optional fallback
 JWT_SECRET=your_jwt_secret
+
+# Optional: auto-create/reset admin account on startup
+ADMIN_BOOTSTRAP_EMAIL=admin@example.com
+ADMIN_BOOTSTRAP_PASSWORD=strong_admin_password
+ADMIN_BOOTSTRAP_ROLE=super_admin
+ADMIN_BOOTSTRAP_FORCE_RESET=false
 ```
 
 ### Frontend (frontend/.env - optional)

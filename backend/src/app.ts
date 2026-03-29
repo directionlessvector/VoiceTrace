@@ -21,6 +21,7 @@ import intelligenceRouter from "./routes/intelligence.routes";
 import insightsRouter    from "./routes/insights.routes";
 import alertsRouter      from "./routes/alerts.routes";
 import adminRouter       from "./routes/admin.routes";
+import { bootstrapAdminFromEnv } from "./services/admin-bootstrap.service";
 
 const app = express();
 
@@ -142,8 +143,18 @@ app.get("/health", (_req: Request, res: Response) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  logger.info(`Server running on http://localhost:${PORT}`);
-});
+async function startServer() {
+  try {
+    await bootstrapAdminFromEnv(logger);
+  } catch (err: any) {
+    logger.error(`Admin bootstrap failed: ${err?.message || "unknown error"}`);
+  }
+
+  app.listen(PORT, () => {
+    logger.info(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+void startServer();
 
 export default app;

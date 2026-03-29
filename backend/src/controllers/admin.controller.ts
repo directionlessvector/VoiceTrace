@@ -15,7 +15,11 @@ export async function loginAdmin(data: { email: string; password: string }) {
     throw new Error("Email and password are required");
   }
 
-  const [adminUser] = await db.select().from(adminUsers).where(eq(adminUsers.email, data.email.trim()));
+  const normalizedEmail = data.email.trim().toLowerCase();
+  const [adminUser] = await db
+    .select()
+    .from(adminUsers)
+    .where(sql`lower(${adminUsers.email}) = ${normalizedEmail}`);
   if (!adminUser) {
     throw new Error("Invalid admin credentials");
   }

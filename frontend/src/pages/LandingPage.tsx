@@ -22,13 +22,23 @@ export default function LandingPage() {
         <img 
           src="/neo_stall_left.png" 
           alt="" 
-          className="absolute left-[-5%] top-1/2 -translate-y-1/2 h-[90vh] object-contain pointer-events-none z-0 mix-blend-multiply" 
-        />
+className="
+  absolute z-0 pointer-events-none mix-blend-multiply object-contain
+
+  top-2 left-2 w-[55%] opacity-80
+
+  md:left-[-5%] md:top-1/2 md:-translate-y-1/2 md:h-[90vh] md:w-auto md:opacity-100
+"        />
         <img 
           src="/neo_stall_right.png" 
           alt="" 
-          className="absolute right-[-5%] top-1/2 -translate-y-1/2 h-[90vh] object-contain pointer-events-none z-0 mix-blend-multiply" 
-        />
+className="
+  absolute z-0 pointer-events-none mix-blend-multiply object-contain
+
+  bottom-2 right-2 w-[55%] opacity-80
+
+  md:right-[-5%] md:top-1/2 md:-translate-y-1/2 md:h-[90vh] md:w-auto md:opacity-100
+"        />
 
         {/* Top Navbar */}
         <nav className="absolute top-0 left-0 right-0 p-3 md:p-6 flex justify-between items-center z-50">
@@ -51,7 +61,7 @@ export default function LandingPage() {
         </nav>
 
         {/* Main Focus: Cinematic Book Animation */}
-        <main className="relative z-10 w-[95%] sm:w-[90%] md:w-[60%] max-w-3xl mx-auto flex items-center justify-center mt-20 h-[300px] sm:h-[400px] md:h-[450px]" style={{ perspective: '2000px' }}>
+        <main className="relative z-10 w-[85%] sm:w-[75%] md:w-[60%] max-w-3xl mx-auto flex items-center justify-center mt-20 h-[260px] sm:h-[340px] md:h-[450px]" style={{ perspective: '2000px' }}>
           
           {/* Book Container */}
           <div 

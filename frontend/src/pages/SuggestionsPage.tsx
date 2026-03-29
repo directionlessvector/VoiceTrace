@@ -7,6 +7,7 @@ import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
 import { suggestions } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
 import { createAlertNotification, type NotificationChannel } from "@/lib/alertsApi";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Package, ArrowUp, ArrowDown, Minus, AlertTriangle, TrendingUp, BarChart3 } from "lucide-react";
 
 type Trend = "increasing" | "stable" | "decreasing";
@@ -156,6 +157,7 @@ function inferConfidence(reason: string, delta: number, stockOutRisk: boolean): 
 }
 
 export default function SuggestionsPage() {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [manualMode, setManualMode] = useState(false);
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
@@ -343,8 +345,8 @@ export default function SuggestionsPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Stock Suggestions</h1>
-        <p className="text-muted-foreground font-medium">AI suggestions enriched with weather-driven recommendations.</p>
+        <h1 className="text-2xl md:text-3xl font-bold">{t("page.suggestions")}</h1>
+        <p className="text-muted-foreground font-medium">{t("page.suggestionsSubtitle")}</p>
 
         <BrutalCard className="p-4" highlight="primary">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

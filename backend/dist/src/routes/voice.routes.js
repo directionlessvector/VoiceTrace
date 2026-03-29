@@ -180,6 +180,11 @@ async function buildUserBusinessContext(userId) {
         expenseTrend: trendFrom(expensesPrevious, expensesCurrent),
         lowStockCount: lowStock.length,
         lowStockTopItem: lowStock[0]?.name,
+        latestLedgerEntries: recentLedger.slice(0, 5).map((entry) => {
+            const amount = Math.round(parseNumeric(entry.amount));
+            const label = (entry.itemName || entry.entryType || "entry").trim();
+            return `${label} (${entry.entryType}) Rs ${amount}`;
+        }),
     };
     const headerParts = [
         user?.name ? `Owner: ${user.name}` : null,
@@ -287,7 +292,7 @@ function detectIntent(userText) {
 }
 function wantsExactNumbers(userText) {
     const t = userText.toLowerCase();
-    return /\b(exact|exactly|how much|numbers|figures|amount)\b/.test(t);
+    return /\b(exact|exactly|how much|numbers|figures|amount|earnings|ledger|latest|entries|totals?)\b/.test(t);
 }
 function truncateWords(text, maxWords = 12) {
     const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
@@ -361,10 +366,13 @@ function buildFallbackResponse(intent, facts, includeNumbers) {
         : "Costs look manageable for now";
     const suggestion = "Improve profit by controlling costs and restocking smartly";
     if (includeNumbers && f) {
+        const latest = f.latestLedgerEntries.length
+            ? f.latestLedgerEntries.slice(0, 3).join(", ")
+            : "no recent entries found";
         return {
-            summary: `${summary} with earnings around Rs ${Math.round(f.earningsTotal)}`,
-            insight: `${insight} and expenses are around Rs ${Math.round(f.expenseTotal)}`,
-            suggestion,
+            summary: `Numbers: earnings Rs ${Math.round(f.earningsTotal)}, expenses Rs ${Math.round(f.expenseTotal)}, net Rs ${Math.round(f.netProfit)}`,
+            insight: `Latest ledger entries are: ${latest}`,
+            suggestion: "Ask for any one metric and I will break it down in detail",
         };
     }
     return { summary, insight, suggestion };
@@ -412,6 +420,7 @@ async function ensureCallConversation(callSid, opts) {
             salesTrend: "flat",
             expenseTrend: "flat",
             lowStockCount: 0,
+            latestLedgerEntries: [],
         });
         return;
     }
@@ -435,11 +444,14 @@ async function generateAssistantReply(callSid, userText) {
     const facts = callBusinessFacts.get(callSid);
     const responseGuide = [
         `Intent: ${intent}.`,
+        "STRICT RULES:",
+        "1. You MUST use the FACTS provided.",
+        "2. DO NOT invent numbers.",
         includeNumbers
-            ? "User asked for exact numbers, you may include concise numbers."
-            : "User did NOT ask for exact numbers, do not include raw totals.",
-        "Return STRICT JSON only with keys: summary, insight, suggestion.",
-        "Each value should be one short spoken sentence.",
+            ? "3. User asked for numbers. Mention earnings, expenses, net, and latest ledger entries."
+            : "3. User did not ask for numbers. Keep it insight-focused and avoid raw totals.",
+        "4. Keep response short and spoken.",
+        "Return STRICT JSON: summary, insight, suggestion.",
     ].join(" ");
     try {
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -461,7 +473,7 @@ async function generateAssistantReply(callSid, userText) {
                     {
                         role: "user",
                         content: includeNumbers || !facts
-                            ? userText
+                            ? `${userText}${facts ? `\nFACTS: earnings=${Math.round(facts.earningsTotal)}, expenses=${Math.round(facts.expenseTotal)}, net=${Math.round(facts.netProfit)}, latestEntries=${facts.latestLedgerEntries.join(" | ") || "none"}.` : ""}`
                             : `${userText}\nBusiness hints: salesTrend=${facts.salesTrend}, expenseTrend=${facts.expenseTrend}, lowStockCount=${facts.lowStockCount}.`,
                     },
                 ],

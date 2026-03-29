@@ -8,6 +8,7 @@ import {
   type WeeklyInsight,
   type WeeklyTopItemPoint,
 } from "@/lib/insightsApi";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Lightbulb, TrendingUp, TrendingDown, PackageSearch, CalendarDays } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis } from "recharts";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -19,6 +20,7 @@ const chartConfig = {
 };
 
 export default function InsightsPage() {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [insights, setInsights] = useState<WeeklyInsight[]>([]);
@@ -78,7 +80,7 @@ export default function InsightsPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Insights</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">{t("page.insights")}</h1>
 
         {error && (
           <BrutalCard highlight="danger">

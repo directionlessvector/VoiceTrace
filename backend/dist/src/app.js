@@ -24,6 +24,7 @@ const intelligence_routes_1 = __importDefault(require("./routes/intelligence.rou
 const insights_routes_1 = __importDefault(require("./routes/insights.routes"));
 const alerts_routes_1 = __importDefault(require("./routes/alerts.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
+const admin_bootstrap_service_1 = require("./services/admin-bootstrap.service");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)({
     origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : true,
@@ -121,7 +122,16 @@ app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
 });
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    logger.info(`Server running on http://localhost:${PORT}`);
-});
+async function startServer() {
+    try {
+        await (0, admin_bootstrap_service_1.bootstrapAdminFromEnv)(logger);
+    }
+    catch (err) {
+        logger.error(`Admin bootstrap failed: ${err?.message || "unknown error"}`);
+    }
+    app.listen(PORT, () => {
+        logger.info(`Server running on http://localhost:${PORT}`);
+    });
+}
+void startServer();
 exports.default = app;

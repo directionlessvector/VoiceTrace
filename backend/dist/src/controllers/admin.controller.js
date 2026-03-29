@@ -22,7 +22,11 @@ async function loginAdmin(data) {
     if (!data.email || !data.password) {
         throw new Error("Email and password are required");
     }
-    const [adminUser] = await client_1.db.select().from(schema_1.adminUsers).where((0, drizzle_orm_1.eq)(schema_1.adminUsers.email, data.email.trim()));
+    const normalizedEmail = data.email.trim().toLowerCase();
+    const [adminUser] = await client_1.db
+        .select()
+        .from(schema_1.adminUsers)
+        .where((0, drizzle_orm_1.sql) `lower(${schema_1.adminUsers.email}) = ${normalizedEmail}`);
     if (!adminUser) {
         throw new Error("Invalid admin credentials");
     }

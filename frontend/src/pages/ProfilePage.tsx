@@ -5,6 +5,7 @@ import { BrutalButton } from "@/components/shared/BrutalButton";
 import { BrutalInput, BrutalSelect } from "@/components/shared/BrutalInput";
 import { SkeletonLoader } from "@/components/shared/SkeletonLoader";
 import { getCurrentUserProfile, updateCurrentUserProfile, uploadCurrentUserProfileImage } from "@/lib/usersApi";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Save, User, Upload } from "lucide-react";
 
 type ProfileForm = {
@@ -19,6 +20,7 @@ type ProfileForm = {
 };
 
 export default function ProfilePage() {
+  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -110,7 +112,7 @@ export default function ProfilePage() {
   return (
     <AppLayout>
       <div className="space-y-6 w-full">
-        <h1 className="text-2xl md:text-3xl font-bold">Profile</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">{t("page.profile")}</h1>
 
         {error && (
           <BrutalCard className="border-destructive">

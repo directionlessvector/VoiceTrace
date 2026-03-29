@@ -12,6 +12,7 @@ import {
   type Alert,
   type NotificationChannel,
 } from "@/lib/alertsApi";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { AlertTriangle, AlertCircle, Info, ArrowDownUp, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,6 +38,7 @@ const ALERT_TYPE_LABELS: Record<Alert["alertType"], string> = {
 
 export default function AlertsPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
@@ -163,8 +165,8 @@ export default function AlertsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Alerts</h1>
-            <p className="text-muted-foreground font-medium">Anomalies detected compared to your daily averages.</p>
+            <h1 className="text-2xl md:text-3xl font-bold">{t("page.alerts")}</h1>
+            <p className="text-muted-foreground font-medium">{t("page.alertsSubtitle")}</p>
           </div>
           <div className="flex items-center gap-2">
             <BrutalButton

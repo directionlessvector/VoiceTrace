@@ -6,11 +6,9 @@ import { FloatingCoin } from "@/components/shared/FloatingCoin";
 import { Mic } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-const ADMIN_ID = import.meta.env.VITE_ADMIN_ID;
-
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, adminLogin, user } = useAuth();
+  const { login, adminLogin } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,17 +32,16 @@ export default function LoginPage() {
     setApiError(null);
 
     try {
-      // 1. Always perform normal user login first
-      await login(email.trim(), password);
+      const identity = email.trim();
+      const looksLikeEmail = identity.includes("@");
 
-      // 2. Check if the logged-in user is the admin
-      if (user?.id === ADMIN_ID) {
-        // This is the admin → also trigger admin login
-        await adminLogin(email.trim(), password);
+      if (looksLikeEmail) {
+        // Email-based sign-in is treated as admin login to avoid masking admin errors.
+        await adminLogin(identity, password);
         navigate("/admin");
       } else {
-        // Normal user login successful
-        navigate("/dashboard"); // ← Change this if your user dashboard route is different
+        await login(identity, password);
+        navigate("/dashboard");
       }
     } catch (err: any) {
       setApiError(err.message || "Login failed. Please try again.");
@@ -113,8 +110,8 @@ export default function LoginPage() {
         <div className="brutal-card p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <BrutalInput
-              label="Phone / Email"
-              placeholder="Enter phone or email"
+              label="Phone (Vendor) / Email (Admin)"
+              placeholder="Enter vendor phone or admin email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               error={errors.email}

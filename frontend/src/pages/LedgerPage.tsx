@@ -15,6 +15,7 @@ import {
 } from "@/lib/ledgerApi";
 import { Search, Play, Pause, Edit3, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type LedgerRow = {
   id: string;
@@ -122,6 +123,7 @@ const PAGE_SIZE = 10;
 
 export default function LedgerPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -453,7 +455,7 @@ export default function LedgerPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Ledger</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">{t("page.ledger")}</h1>
 
         <div className="flex flex-col gap-3">
           <div className="relative flex-1">

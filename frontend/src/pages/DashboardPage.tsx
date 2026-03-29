@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { AppLayout } from "@/layouts/AppLayout";
 import { StatCard } from "@/components/shared/StatCard";
 import { BrutalCard } from "@/components/shared/BrutalCard";
@@ -12,11 +12,190 @@ import { createVoiceLedgerEntry, listCurrentUserLedgerEntries, type LedgerEntry,
 import { createVoiceFlag, listPendingVoiceFlags, resolveVoiceFlag, type VoiceFlag } from "@/lib/voiceFlagsApi";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { DollarSign, TrendingDown, TrendingUp, Mic, Lightbulb, PhoneCall } from "lucide-react";
 
 type TrendInfo = {
   trend: "up" | "down" | "neutral";
   value: string;
+};
+
+type LocaleCopy = {
+  greeting: string;
+  fallbackName: string;
+  overview: string;
+  callAssistant: string;
+  recordEntry: string;
+  earnings: string;
+  expenses: string;
+  profit: string;
+  vsLastWeek: string;
+  newVsLastWeek: string;
+  insightTitle: string;
+  insightBody: string;
+  recentActivity: string;
+  noEntries: string;
+  voiceSale: string;
+  voiceExpense: string;
+  callModalTitle: string;
+  callModalDesc: string;
+  startCall: string;
+  quickClarification: string;
+  approxDetected: string;
+  uncertainLine: string;
+  noTextAvailable: string;
+  confirmApproxPrompt: string;
+  correctedPlaceholder: string;
+  keepApprox: string;
+  submitCorrection: string;
+};
+
+const DASHBOARD_COPY: Record<string, LocaleCopy> = {
+  en: {
+    greeting: "Good morning",
+    fallbackName: "there",
+    overview: "Here's your business overview for today.",
+    callAssistant: "Call Assistant",
+    recordEntry: "Record Entry",
+    earnings: "Earnings",
+    expenses: "Expenses",
+    profit: "Profit",
+    vsLastWeek: "vs last week",
+    newVsLastWeek: "new vs last week",
+    insightTitle: "Weekend Boost!",
+    insightBody: "You earn 40% more on weekends. Consider stocking extra on Fridays for maximum profit.",
+    recentActivity: "Recent Activity",
+    noEntries: "No entries yet. Record your first voice entry!",
+    voiceSale: "Voice sale",
+    voiceExpense: "Voice expense",
+    callModalTitle: "Call Voice Assistant",
+    callModalDesc: "Enter the phone number to receive the call. Use E.164 format like +919876543210.",
+    startCall: "Start Call",
+    quickClarification: "Quick Clarification Needed",
+    approxDetected: "We detected an approximate voice entry and saved it so nothing is lost.",
+    uncertainLine: "Uncertain line",
+    noTextAvailable: "No text available",
+    confirmApproxPrompt: "Is this entry okay as approximate? If not, enter corrected amount/value below.",
+    correctedPlaceholder: "Enter corrected amount/value",
+    keepApprox: "Yes, keep approximate",
+    submitCorrection: "Submit correction",
+  },
+  hi: {
+    greeting: "सुप्रभात",
+    fallbackName: "मित्र",
+    overview: "आज के लिए आपके व्यवसाय का सारांश यहां है।",
+    callAssistant: "सहायक को कॉल करें",
+    recordEntry: "एंट्री रिकॉर्ड करें",
+    earnings: "कमाई",
+    expenses: "खर्च",
+    profit: "मुनाफा",
+    vsLastWeek: "पिछले सप्ताह से",
+    newVsLastWeek: "पिछले सप्ताह के मुकाबले नया",
+    insightTitle: "वीकेंड बूस्ट!",
+    insightBody: "वीकेंड पर आपकी कमाई 40% ज्यादा होती है। ज्यादा मुनाफे के लिए शुक्रवार को अतिरिक्त स्टॉक रखें।",
+    recentActivity: "हाल की गतिविधि",
+    noEntries: "अभी तक कोई एंट्री नहीं। अपनी पहली वॉयस एंट्री रिकॉर्ड करें!",
+    voiceSale: "वॉयस बिक्री",
+    voiceExpense: "वॉयस खर्च",
+    callModalTitle: "वॉयस सहायक को कॉल करें",
+    callModalDesc: "कॉल प्राप्त करने के लिए फोन नंबर दर्ज करें। E.164 फॉर्मेट जैसे +919876543210 का उपयोग करें।",
+    startCall: "कॉल शुरू करें",
+    quickClarification: "त्वरित स्पष्टीकरण आवश्यक",
+    approxDetected: "हमें एक अनुमानित वॉयस एंट्री मिली और हमने उसे सुरक्षित कर लिया ताकि डेटा न खोए।",
+    uncertainLine: "अस्पष्ट पंक्ति",
+    noTextAvailable: "कोई टेक्स्ट उपलब्ध नहीं",
+    confirmApproxPrompt: "क्या यह एंट्री अनुमानित रूप में सही है? नहीं तो नीचे सही राशि/वैल्यू दर्ज करें।",
+    correctedPlaceholder: "सही राशि/वैल्यू दर्ज करें",
+    keepApprox: "हाँ, अनुमानित ही रखें",
+    submitCorrection: "सुधार सबमिट करें",
+  },
+  mr: {
+    greeting: "शुभ सकाळ",
+    fallbackName: "मित्रा",
+    overview: "आजसाठी तुमच्या व्यवसायाचा आढावा येथे आहे.",
+    callAssistant: "सहाय्यकाला कॉल करा",
+    recordEntry: "नोंद रेकॉर्ड करा",
+    earnings: "उत्पन्न",
+    expenses: "खर्च",
+    profit: "नफा",
+    vsLastWeek: "मागील आठवड्याच्या तुलनेत",
+    newVsLastWeek: "मागील आठवड्याच्या तुलनेत नवीन",
+    insightTitle: "वीकेंड बूस्ट!",
+    insightBody: "वीकेंडला तुमचे उत्पन्न 40% जास्त असते. जास्त नफ्यासाठी शुक्रवारी अतिरिक्त स्टॉक ठेवा.",
+    recentActivity: "अलिकडील क्रियाकलाप",
+    noEntries: "अजून नोंदी नाहीत. तुमची पहिली व्हॉइस नोंद रेकॉर्ड करा!",
+    voiceSale: "व्हॉइस विक्री",
+    voiceExpense: "व्हॉइस खर्च",
+    callModalTitle: "व्हॉइस सहाय्यकाला कॉल करा",
+    callModalDesc: "कॉल मिळवण्यासाठी फोन नंबर भरा. +919876543210 सारखा E.164 फॉरमॅट वापरा.",
+    startCall: "कॉल सुरू करा",
+    quickClarification: "त्वरित स्पष्टीकरण हवे",
+    approxDetected: "आम्हाला अंदाजे व्हॉइस नोंद आढळली आणि डेटा न हरवता ती जतन केली.",
+    uncertainLine: "अनिश्चित ओळ",
+    noTextAvailable: "मजकूर उपलब्ध नाही",
+    confirmApproxPrompt: "ही नोंद अंदाजे म्हणून योग्य आहे का? नसेल तर खाली योग्य रक्कम/मूल्य भरा.",
+    correctedPlaceholder: "योग्य रक्कम/मूल्य भरा",
+    keepApprox: "हो, अंदाजेच ठेवा",
+    submitCorrection: "सुधारणा सबमिट करा",
+  },
+  ta: {
+    greeting: "காலை வணக்கம்",
+    fallbackName: "நண்பரே",
+    overview: "இன்றைய உங்கள் வணிகத்தின் சுருக்கம் இங்கே.",
+    callAssistant: "உதவியாளரை அழைக்கவும்",
+    recordEntry: "பதிவு செய்",
+    earnings: "வருவாய்",
+    expenses: "செலவு",
+    profit: "லாபம்",
+    vsLastWeek: "கடந்த வாரத்துடன் ஒப்பிடுக",
+    newVsLastWeek: "கடந்த வாரத்துடன் ஒப்பிடும் போது புதியது",
+    insightTitle: "வார இறுதி உயர்வு!",
+    insightBody: "வார இறுதியில் உங்கள் வருவாய் 40% அதிகம். அதிக லாபத்திற்கு வெள்ளிக்கிழமையிலே கூடுதல் ஸ்டாக் வைத்துக்கொள்ளுங்கள்.",
+    recentActivity: "சமீப செயல்பாடுகள்",
+    noEntries: "இன்னும் பதிவுகள் இல்லை. உங்கள் முதல் குரல் பதிவை சேமிக்கவும்!",
+    voiceSale: "குரல் விற்பனை",
+    voiceExpense: "குரல் செலவு",
+    callModalTitle: "குரல் உதவியாளரை அழைக்கவும்",
+    callModalDesc: "அழைப்பு பெற தொலைபேசி எண்ணை உள்ளிடுங்கள். +919876543210 போன்ற E.164 வடிவம் பயன்படுத்தவும்.",
+    startCall: "அழைப்பை தொடங்கு",
+    quickClarification: "விரைவான தெளிவு தேவை",
+    approxDetected: "சுமார் குரல் பதிவு கண்டறியப்பட்டது, தரவு இழக்காமல் சேமித்துவைத்தோம்.",
+    uncertainLine: "தெளிவில்லா வரி",
+    noTextAvailable: "எழுத்து இல்லை",
+    confirmApproxPrompt: "இந்த பதிவு சுமார் மதிப்பாக வைத்திருக்கலாமா? இல்லையெனில் சரியான மதிப்பை கீழே உள்ளிடுங்கள்.",
+    correctedPlaceholder: "சரியான மதிப்பு உள்ளிடவும்",
+    keepApprox: "ஆம், சுமார் மதிப்பாகவே வைக்கவும்",
+    submitCorrection: "திருத்தம் சமர்ப்பிக்கவும்",
+  },
+  te: {
+    greeting: "శుభోదయం",
+    fallbackName: "మిత్రమా",
+    overview: "ఈ రోజు మీ వ్యాపార సమీక్ష ఇది.",
+    callAssistant: "అసిస్టెంట్‌కు కాల్ చేయండి",
+    recordEntry: "ఎంట్రీ రికార్డ్ చేయండి",
+    earnings: "ఆదాయం",
+    expenses: "ఖర్చులు",
+    profit: "లాభం",
+    vsLastWeek: "గత వారంతో పోలిస్తే",
+    newVsLastWeek: "గత వారంతో పోలిస్తే కొత్తది",
+    insightTitle: "వీకెండ్ బూస్ట్!",
+    insightBody: "వీకెండ్‌లో మీ ఆదాయం 40% ఎక్కువగా ఉంటుంది. ఎక్కువ లాభం కోసం శుక్రవారం అదనపు స్టాక్ పెట్టండి.",
+    recentActivity: "ఇటీవలి కార్యకలాపాలు",
+    noEntries: "ఇంకా ఎంట్రీలు లేవు. మీ మొదటి వాయిస్ ఎంట్రీని రికార్డ్ చేయండి!",
+    voiceSale: "వాయిస్ అమ్మకం",
+    voiceExpense: "వాయిస్ ఖర్చు",
+    callModalTitle: "వాయిస్ అసిస్టెంట్‌కు కాల్ చేయండి",
+    callModalDesc: "కాల్ పొందడానికి ఫోన్ నంబర్ ఇవ్వండి. +919876543210 లాంటి E.164 ఫార్మాట్ వాడండి.",
+    startCall: "కాల్ ప్రారంభించండి",
+    quickClarification: "త్వరిత స్పష్టీకరణ అవసరం",
+    approxDetected: "సుమారుగా ఉన్న వాయిస్ ఎంట్రీని గుర్తించాం, డేటా కోల్పోకుండా సేవ్ చేశాం.",
+    uncertainLine: "అస్పష్టమైన లైన్",
+    noTextAvailable: "టెక్స్ట్ అందుబాటులో లేదు",
+    confirmApproxPrompt: "ఈ ఎంట్రీని సుమారుగా ఉంచాలా? లేదంటే కరెక్ట్ విలువను క్రింద ఇవ్వండి.",
+    correctedPlaceholder: "సరైన విలువ ఇవ్వండి",
+    keepApprox: "అవును, సుమారుగా ఉంచండి",
+    submitCorrection: "సవరణను సమర్పించండి",
+  },
 };
 
 type SuggestedCorrection = {
@@ -42,9 +221,14 @@ function formatPercent(value: number): string {
   return Number.isInteger(rounded) ? `${rounded.toFixed(0)}%` : `${rounded.toFixed(1)}%`;
 }
 
-function calculateTrend(current: number, previous: number, invertDirection = false): TrendInfo {
+function calculateTrend(
+  current: number,
+  previous: number,
+  labels: { vsLastWeek: string; newVsLastWeek: string },
+  invertDirection = false
+): TrendInfo {
   if (previous === 0 && current === 0) {
-    return { trend: "neutral", value: "0% vs last week" };
+    return { trend: "neutral", value: `0% ${labels.vsLastWeek}` };
   }
 
   if (previous === 0) {
@@ -56,7 +240,7 @@ function calculateTrend(current: number, previous: number, invertDirection = fal
           ? "up"
           : "neutral"
       : rawTrend;
-    return { trend, value: "new vs last week" };
+    return { trend, value: labels.newVsLastWeek };
   }
 
   const changePct = ((current - previous) / previous) * 100;
@@ -71,12 +255,15 @@ function calculateTrend(current: number, previous: number, invertDirection = fal
 
   return {
     trend,
-    value: `${formatPercent(Math.abs(changePct))} vs last week`,
+    value: `${formatPercent(Math.abs(changePct))} ${labels.vsLastWeek}`,
   };
 }
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { language } = useLanguage();
+  const lang = language.toLowerCase();
+  const copy = useMemo(() => DASHBOARD_COPY[lang] || DASHBOARD_COPY.en, [lang]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ earnings: 0, expenses: 0, profit: 0 });
   const [trends, setTrends] = useState<{
@@ -84,9 +271,9 @@ export default function DashboardPage() {
     expenses: TrendInfo;
     profit: TrendInfo;
   }>({
-    earnings: { trend: "neutral", value: "0% vs last week" },
-    expenses: { trend: "neutral", value: "0% vs last week" },
-    profit: { trend: "neutral", value: "0% vs last week" },
+    earnings: { trend: "neutral", value: "0%" },
+    expenses: { trend: "neutral", value: "0%" },
+    profit: { trend: "neutral", value: "0%" },
   });
   const [recentEntries, setRecentEntries] = useState<LedgerEntry[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -164,10 +351,10 @@ export default function DashboardPage() {
       const previousWeekProfit = previousWeekEarnings - previousWeekExpenses;
 
       setTrends({
-        earnings: calculateTrend(currentWeekEarnings, previousWeekEarnings),
+        earnings: calculateTrend(currentWeekEarnings, previousWeekEarnings, copy),
         // Lower expenses are better, so invert trend direction for this card.
-        expenses: calculateTrend(currentWeekExpenses, previousWeekExpenses, true),
-        profit: calculateTrend(currentWeekProfit, previousWeekProfit),
+        expenses: calculateTrend(currentWeekExpenses, previousWeekExpenses, copy, true),
+        profit: calculateTrend(currentWeekProfit, previousWeekProfit, copy),
       });
 
       const recent = [...entries]
@@ -178,7 +365,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
     }
-  }, []);
+  }, [copy]);
 
   // Initial load
   useEffect(() => {
@@ -202,7 +389,7 @@ export default function DashboardPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [copy]);
 
   const handleAcceptFlag = async () => {
     if (!pendingFlag) return;
@@ -418,18 +605,18 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">
-              Good morning, {user?.name?.split(" ")[0] ?? "there"}! 👋
+              {copy.greeting}, {user?.name?.split(" ")[0] ?? copy.fallbackName}! 👋
             </h1>
             <p className="text-muted-foreground font-medium">
-              Here's your business overview for today.
+              {copy.overview}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <BrutalButton variant="outline" size="lg" onClick={() => setCallOpen(true)}>
-              <PhoneCall size={20} /> Call Assistant
+              <PhoneCall size={20} /> {copy.callAssistant}
             </BrutalButton>
             <BrutalButton variant="primary" size="lg" onClick={() => setVoiceOpen(true)}>
-              <Mic size={22} /> Record Entry
+              <Mic size={22} /> {copy.recordEntry}
             </BrutalButton>
           </div>
         </div>
@@ -437,7 +624,7 @@ export default function DashboardPage() {
         {/* Stats */}
         <div className="grid sm:grid-cols-3 gap-4">
           <StatCard 
-            title="Earnings" 
+            title={copy.earnings} 
             value={stats.earnings} 
             icon={DollarSign} 
             variant="earnings" 
@@ -445,7 +632,7 @@ export default function DashboardPage() {
             trendValue={trends.earnings.value} 
           />
           <StatCard 
-            title="Expenses" 
+            title={copy.expenses} 
             value={stats.expenses} 
             icon={TrendingDown} 
             variant="expenses" 
@@ -453,7 +640,7 @@ export default function DashboardPage() {
             trendValue={trends.expenses.value} 
           />
           <StatCard 
-            title="Profit" 
+            title={copy.profit} 
             value={stats.profit} 
             icon={TrendingUp} 
             variant="profit" 
@@ -468,20 +655,20 @@ export default function DashboardPage() {
             <Lightbulb size={20} />
           </div>
           <div>
-            <h3 className="font-bold">Weekend Boost!</h3>
+            <h3 className="font-bold">{copy.insightTitle}</h3>
             <p className="text-sm text-muted-foreground font-medium">
-              You earn 40% more on weekends. Consider stocking extra on Fridays for maximum profit.
+              {copy.insightBody}
             </p>
           </div>
         </BrutalCard>
 
         {/* Recent Activity */}
         <div>
-          <h2 className="text-xl font-bold mb-3">Recent Activity</h2>
+          <h2 className="text-xl font-bold mb-3">{copy.recentActivity}</h2>
           {recentEntries.length === 0 ? (
             <BrutalCard className="text-center py-8">
               <p className="text-muted-foreground font-medium">
-                No entries yet. Record your first voice entry!
+                {copy.noEntries}
               </p>
             </BrutalCard>
           ) : (
@@ -496,7 +683,7 @@ export default function DashboardPage() {
                   >
                     <div>
                       <p className="font-bold">
-                        {entry.itemName ?? (isSale ? "Voice sale" : "Voice expense")}
+                        {entry.itemName ?? (isSale ? copy.voiceSale : copy.voiceExpense)}
                       </p>
                       <p className="text-sm text-muted-foreground font-medium">
                         {entry.entryDate}
@@ -520,10 +707,10 @@ export default function DashboardPage() {
         onSave={handleSave} 
       />
 
-      <BrutalModal open={callOpen} onClose={() => setCallOpen(false)} title="Call Voice Assistant">
+      <BrutalModal open={callOpen} onClose={() => setCallOpen(false)} title={copy.callModalTitle}>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground font-medium">
-            Enter the phone number to receive the call. Use E.164 format like +919876543210.
+            {copy.callModalDesc}
           </p>
           <input
             value={callNumber}
@@ -533,36 +720,36 @@ export default function DashboardPage() {
           />
           <div className="flex justify-end">
             <BrutalButton variant="primary" onClick={handleStartCall} loading={isCalling}>
-              <PhoneCall size={16} /> Start Call
+              <PhoneCall size={16} /> {copy.startCall}
             </BrutalButton>
           </div>
         </div>
       </BrutalModal>
 
-      <BrutalModal open={flagPromptOpen} onClose={() => setFlagPromptOpen(false)} title="Quick Clarification Needed">
+      <BrutalModal open={flagPromptOpen} onClose={() => setFlagPromptOpen(false)} title={copy.quickClarification}>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground font-medium">
-            We detected an approximate voice entry and saved it so nothing is lost.
+            {copy.approxDetected}
           </p>
           <div className="brutal-card p-3 bg-muted/30">
-            <p className="font-bold text-sm">Uncertain line</p>
-            <p className="text-sm text-muted-foreground">{pendingFlag?.originalText ?? "No text available"}</p>
+            <p className="font-bold text-sm">{copy.uncertainLine}</p>
+            <p className="text-sm text-muted-foreground">{pendingFlag?.originalText ?? copy.noTextAvailable}</p>
           </div>
           <p className="text-sm font-medium">
-            Is this entry okay as approximate? If not, enter corrected amount/value below.
+            {copy.confirmApproxPrompt}
           </p>
           <input
             value={clarificationValue}
             onChange={(e) => setClarificationValue(e.target.value)}
-            placeholder="Enter corrected amount/value"
+            placeholder={copy.correctedPlaceholder}
             className="w-full px-4 py-2.5 brutal-input"
           />
           <div className="flex flex-wrap justify-end gap-2">
             <BrutalButton variant="outline" onClick={handleAcceptFlag} loading={flagSubmitting}>
-              Yes, keep approximate
+              {copy.keepApprox}
             </BrutalButton>
             <BrutalButton variant="primary" onClick={handleCorrectFlag} loading={flagSubmitting}>
-              Submit correction
+              {copy.submitCorrection}
             </BrutalButton>
           </div>
         </div>

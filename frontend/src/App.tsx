@@ -4,6 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { LanguageProvider } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
@@ -23,6 +25,36 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const AppRoutes = () => {
+  const { user } = useAuth();
+
+  return (
+    <LanguageProvider preferredLanguage={user?.languagePreference}>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+
+        {/* Protected routes */}
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/ledger" element={<ProtectedRoute><LedgerPage /></ProtectedRoute>} />
+        <Route path="/upload-ledger" element={<ProtectedRoute><UploadLedgerPage /></ProtectedRoute>} />
+        <Route path="/udhaar" element={<ProtectedRoute><UdhaarBookPage /></ProtectedRoute>} />
+        <Route path="/insights" element={<ProtectedRoute><InsightsPage /></ProtectedRoute>} />
+        <Route path="/suggestions" element={<ProtectedRoute><SuggestionsPage /></ProtectedRoute>} />
+        <Route path="/nearby-suppliers" element={<ProtectedRoute><NearbySuppliersPage /></ProtectedRoute>} />
+        <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
+        <Route path="/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </LanguageProvider>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -30,27 +62,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-
-            {/* Protected routes */}
-            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="/ledger" element={<ProtectedRoute><LedgerPage /></ProtectedRoute>} />
-            <Route path="/upload-ledger" element={<ProtectedRoute><UploadLedgerPage /></ProtectedRoute>} />
-            <Route path="/udhaar" element={<ProtectedRoute><UdhaarBookPage /></ProtectedRoute>} />
-            <Route path="/insights" element={<ProtectedRoute><InsightsPage /></ProtectedRoute>} />
-            <Route path="/suggestions" element={<ProtectedRoute><SuggestionsPage /></ProtectedRoute>} />
-            <Route path="/nearby-suppliers" element={<ProtectedRoute><NearbySuppliersPage /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
-            <Route path="/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-            <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
-
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AppRoutes />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

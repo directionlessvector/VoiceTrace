@@ -85,6 +85,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persist = (t: string, u: AuthUser) => {
+    // Vendor login should clear any existing admin session.
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
+    localStorage.removeItem(ADMIN_USER_KEY);
+    setAdminToken(null);
+    setAdminUser(null);
+
     localStorage.setItem(TOKEN_KEY, t);
     localStorage.setItem(USER_KEY, JSON.stringify(u));
     setToken(t);
@@ -92,6 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const persistAdmin = (t: string, u: AdminUser) => {
+    // Admin login should clear any existing vendor session.
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem("voicetrace_user_id");
+    setToken(null);
+    setUser(null);
+
     localStorage.setItem(ADMIN_TOKEN_KEY, t);
     localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(u));
     setAdminToken(t);
