@@ -60,7 +60,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             <div className="w-9 h-9 bg-primary rounded-sm brutal-border flex items-center justify-center">
               <Mic size={20} className="text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold tracking-tight">VoiceTrace</span>
+            <span className="text-xl font-bold tracking-tight">Vyapar Saathi</span>
           </Link>
           <button className="lg:hidden p-1" onClick={() => setSidebarOpen(false)}>
             <X size={20} />

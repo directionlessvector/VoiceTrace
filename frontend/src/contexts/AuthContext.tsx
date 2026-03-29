@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (phone: string, password: string) => {
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://voicetrace-api-xtzg.onrender.com";
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (data: RegisterPayload) => {
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://voicetrace-api-xtzg.onrender.com";
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -123,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const adminLogin = async (email: string, password: string) => {
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://voicetrace-api-xtzg.onrender.com";
     const res = await fetch(`${API_BASE}/admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

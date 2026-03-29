@@ -71,16 +71,34 @@ export default function NearbySuppliersPage() {
     (async () => {
       try {
         setLoading(true);
-        const [low, mine] = await Promise.all([fetchLowStockItems(), fetchUserSuppliers()]);
+        const [lowResult, myResult] = await Promise.allSettled([
+          fetchLowStockItems(),
+          fetchUserSuppliers(),
+        ]);
         if (!mounted) return;
-        setLowStock(low);
-        setMySuppliers(mine);
-        if (low.length && !searchItem) {
-          setSearchItem(low[0].name);
+
+        if (lowResult.status === "fulfilled") {
+          setLowStock(lowResult.value);
+          if (lowResult.value.length && !searchItem) {
+            setSearchItem(lowResult.value[0].name);
+          }
         }
-      } catch (e) {
-        if (!mounted) return;
-        setError(e instanceof Error ? e.message : "Failed to load supplier data");
+
+        if (myResult.status === "fulfilled") {
+          setMySuppliers(myResult.value);
+        }
+
+        const loadErrors: string[] = [];
+        if (lowResult.status === "rejected") {
+          loadErrors.push(lowResult.reason instanceof Error ? lowResult.reason.message : "Low stock unavailable");
+        }
+        if (myResult.status === "rejected") {
+          loadErrors.push(myResult.reason instanceof Error ? myResult.reason.message : "Your suppliers unavailable");
+        }
+
+        if (loadErrors.length) {
+          setError(`Some vendor data is unavailable. Nearby OSM suppliers still work. (${loadErrors[0]})`);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -117,8 +135,8 @@ export default function NearbySuppliersPage() {
     }
   }, [coords]);
 
-  const mySuppliersWithDistance = useMemo(() => {
-    if (!coords) return mySuppliers;
+  const mySuppliersWithDistance = useMemo<Array<UserSupplier & { distanceKm: number | null }>>(() => {
+    if (!coords) return mySuppliers.map((s) => ({ ...s, distanceKm: null }));
     return mySuppliers
       .map((s) => {
         const lat = toNumber(s.lat);
@@ -241,7 +259,7 @@ export default function NearbySuppliersPage() {
           </div>
         </BrutalCard>
 
-        <BrutalCard highlight="info">
+        <BrutalCard highlight="secondary">
           <div className="flex items-center gap-2 mb-3">
             <Store size={18} className="text-primary" />
             <h2 className="text-lg font-bold">Your Suppliers</h2>
@@ -266,7 +284,7 @@ export default function NearbySuppliersPage() {
                         <p className="text-sm text-muted-foreground font-medium">
                           {supplier.category || "general"}
                           {" • "}
-                          {"distanceKm" in supplier && supplier.distanceKm !== null
+                          {supplier.distanceKm !== null
                             ? `${supplier.distanceKm.toFixed(2)} km`
                             : "distance unavailable"}
                         </p>

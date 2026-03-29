@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://voicetrace-api-xtzg.onrender.com";
 
 const TOKEN_KEY = "voicetrace_token";
 const USER_KEY = "voicetrace_user";
